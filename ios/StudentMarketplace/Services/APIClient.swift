@@ -7,7 +7,7 @@ class APIClient {
 
     /// Base URL of the FastAPI server.
     /// Change to your machine's IP if running on a physical device.
-    static let baseURL = "http://localhost:5000"
+    static let baseURL = "http://127.0.0.1:5000"
 
     // MARK: - GET /items
 
