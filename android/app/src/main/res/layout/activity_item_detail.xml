@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Image placeholder -->
+        <View
+            android:id="@+id/detail_image_placeholder"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:background="#E0E0E0" />
+
+        <!-- TODO: Populate these fields with data from GET /items/{id} -->
+
+        <TextView
+            android:id="@+id/detail_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Item Title"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/detail_price"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="0.00 EUR"
+            android:textSize="20sp"
+            android:textColor="#1B5E20"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/detail_category"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Category"
+            android:textSize="14sp"
+            android:textColor="#757575" />
+
+        <TextView
+            android:id="@+id/detail_description"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Description goes here..."
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/detail_seller"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Seller: ..."
+            android:textSize="14sp"
+            android:textColor="#9E9E9E" />
+
+        <TextView
+            android:id="@+id/detail_date"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Posted: ..."
+            android:textSize="14sp"
+            android:textColor="#9E9E9E" />
+
+        <!-- TODO: Add a "Mark as sold" button -->
+
+    </LinearLayout>
+
+</ScrollView>
