@@ -6,6 +6,15 @@ This project is approximately **60% complete**. Your challenge: finish the remai
 
 ---
 
+## Team
+
+| Name | Track | Gitea account |
+|------|-------|---------------|
+| Aaliyah Momodu | CS | `aaliyah.momodu` |
+| Ali Elrogbany | SE | `ali.elrogbany` |
+| Atef Fawaz | SE | `atef1.fawaz` |
+
+---
 ## Architecture
 
 ```
