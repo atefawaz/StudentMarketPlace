@@ -18,6 +18,7 @@ class ItemDetailViewController: UIViewController {
     private let sellerLabel = UILabel()
     private let dateLabel = UILabel()
     private let descriptionLabel = UILabel()
+    private let soldBadge = UILabel()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -50,6 +51,7 @@ class ItemDetailViewController: UIViewController {
         sellerLabel.text = "Sold by \(item.sellerName)"
         dateLabel.text = "Posted \(relativeDate(from: item.createdAt))"
         descriptionLabel.text = item.description ?? "No description provided ."
+        soldBadge.isHidden = !item.isSold
     }
     
     
@@ -62,7 +64,7 @@ class ItemDetailViewController: UIViewController {
         parser.locale = Locale(identifier: "en_US_POSIX")
         
         guard let date = parser.date(from: raw) else {
-                    return raw                                    
+                    return raw
                 }
                 let formatter = RelativeDateTimeFormatter()
                 formatter.unitsStyle = .full
@@ -79,8 +81,18 @@ class ItemDetailViewController: UIViewController {
         titleLabel.numberOfLines = 0
         descriptionLabel.numberOfLines = 0
         
-        [titleLabel, priceLabel, categoryLabel, sellerLabel, dateLabel, descriptionLabel]
+        [soldBadge , titleLabel, priceLabel, categoryLabel, sellerLabel, dateLabel, descriptionLabel]
                     .forEach { stack.addArrangedSubview($0) }
+        
+        
+        soldBadge.text = " SOLD "
+        soldBadge.font = .boldSystemFont(ofSize: 28)
+        soldBadge.textColor = .white
+        soldBadge.backgroundColor = .systemRed
+        soldBadge.textAlignment = .center
+        soldBadge.layer.cornerRadius = 8
+        soldBadge.clipsToBounds = true
+        soldBadge.isHidden = true
         
         
         view.addSubview(stack)
