@@ -13,7 +13,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db
-from models import ItemCreate, ItemOut, get_all_items, get_item_by_id, create_item
+from models import (
+    ItemCreate, 
+    ItemOut, 
+    CategoryOut, 
+    get_all_items, 
+    get_item_by_id, 
+    create_item, 
+    get_all_categories
+)
 
 SECRET_KEY = "super-secret-key-123"
 
@@ -72,7 +80,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-# ---------- Endpoints ----------
+# ---------- Item Endpoints ----------
 
 
 @app.get("/items", response_model=list[ItemOut])
@@ -95,6 +103,12 @@ def add_item(item: ItemCreate):
     """Create a new marketplace listing."""
     return create_item(item)
 
+# ---------- Category Endpoints ----------
+
+@app.get("/categories", response_model=list[CategoryOut])
+def list_categories():
+    """Return all item categories, most frequest first."""
+    return get_all_categories()
 
 # ---------- Search ----------
 
