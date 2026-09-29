@@ -16,14 +16,9 @@ class CreateItemViewController: UIViewController {
     private let titleField = FormTextField(placeholder: "e.g. Vintage road bike")
     private let descriptionField = FormTextField(placeholder: "Describe your item")
     private let priceField = FormTextField(placeholder: "0.00")
-    private let categoryField = FormTextField(placeholder: "e.g. Sports")
+    private let categoryField = FormDropdownField(placeholder: "Select a category", options: ItemCategory.allCases.map(\.rawValue))
     private let sellerField = FormTextField(placeholder: "Your name")
     private let submitButton = UIButton(type: .system)
-    
-    /// The order the "Next" key walks through the fields.
-    private lazy var orderedFields: [UITextField] = [
-        titleField, descriptionField, priceField, categoryField, sellerField
-    ]
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -44,8 +39,6 @@ class CreateItemViewController: UIViewController {
         descriptionField.autocapitalizationType = .sentences
         
         priceField.keyboardType = .decimalPad   /// digits and a decimal separator only
-        
-        categoryField.autocapitalizationType = .words
         
         sellerField.autocapitalizationType = .words
         sellerField.autocorrectionType = .no
@@ -104,7 +97,7 @@ class CreateItemViewController: UIViewController {
         ])
     }
     
-    private func makeGroup(label text: String, field: UITextField) -> UIStackView {
+    private func makeGroup(label text: String, field: UIView) -> UIStackView {
         let label = UILabel()
         label.text = text
         label.font = .preferredFont(forTextStyle: .subheadline)
@@ -137,7 +130,7 @@ class CreateItemViewController: UIViewController {
         
         let title = titleField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let description = descriptionField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let category = categoryField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let category = categoryField.selectedOption ?? ""
         let seller = sellerField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         
         let price = Decimal(
