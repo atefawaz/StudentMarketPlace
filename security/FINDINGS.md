@@ -2,7 +2,7 @@
 
 | ID | Finding | CWE | Severity | Status | Evidence |
 |----|---------|-----|----------|--------|----------|
-| C007 | SQLi in /items/search | 89 | Critical | investigating | |
+| C007 | SQLi in /items/search | 89 | Critical | DONE | |
 | C008 | Stored XSS in /admin | 79 | High | todo | |
 | C009 | IDOR on PATCH/DELETE /items/{id} | 639 | High | todo | |
 | C010 | Hardcoded secrets | 798 | Medium | todo | |
