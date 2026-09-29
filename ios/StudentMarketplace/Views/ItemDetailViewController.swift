@@ -20,6 +20,16 @@ class ItemDetailViewController: UIViewController {
     private let descriptionLabel = UILabel()
     private let soldBadge = UILabel()
     
+    private let spinner = UIActivityIndicatorView(style: .large)
+    private let errorLabel = UILabel()
+    private lazy var retryButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Retry", for: .normal)
+        button.addTarget(self, action: #selector(loadItem), for: .touchUpInside)
+        return button
+    }()
+    private lazy var errorStack = UIStackView(arrangedSubviews: [errorLabel , retryButton])
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Item Detail"
@@ -30,15 +40,17 @@ class ItemDetailViewController: UIViewController {
     
 //    Loading the data
     
-    private func loadItem() {
+    @objc private func loadItem() {
+            setState(.loading)
             APIClient.getItem(id: itemId) { [weak self] result in
                 DispatchQueue.main.async {
                     guard let self = self else { return }
                     switch result {
                     case .success(let item):
                         self.populate(with: item)
+                        self.setState(.loaded)
                     case .failure(let error):
-                        print("Failed to load item: \(error)")
+                        self.setState(.error(error))
                     }
                 }
             }
@@ -69,6 +81,36 @@ class ItemDetailViewController: UIViewController {
                 let formatter = RelativeDateTimeFormatter()
                 formatter.unitsStyle = .full
                 return formatter.localizedString(for: date, relativeTo: Date())
+
+    }
+    
+    
+    
+    // SMKT-005 : Screen state
+    
+    private enum State {
+        case loading , loaded
+        case error(Error)
+    }
+    
+    private func setState(_ state : State) {
+        switch state {
+        case .loading :
+            spinner.startAnimating()
+            stack.isHidden = true
+            errorStack.isHidden = true
+            
+        case .loaded :
+            spinner.stopAnimating()
+            stack.isHidden = false
+            errorStack.isHidden = true
+            
+        case .error(let error) :
+            spinner.stopAnimating()
+            stack.isHidden = true
+            errorStack.isHidden = false
+            errorLabel.text = error.localizedDescription
+        }
     }
     
     // Layout
@@ -93,7 +135,18 @@ class ItemDetailViewController: UIViewController {
         soldBadge.layer.cornerRadius = 8
         soldBadge.clipsToBounds = true
         soldBadge.isHidden = true
-        
+        spinner.hidesWhenStopped = true
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(spinner)
+        errorLabel.numberOfLines = 0
+        errorLabel.textAlignment = .center
+        errorLabel.textColor = .secondaryLabel
+        errorStack.axis = .vertical
+        errorStack.spacing = 12
+        errorStack.alignment = .center
+        errorStack.isHidden = true
+        errorStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(errorStack)
         
         view.addSubview(stack)
                 let guide = view.safeAreaLayoutGuide
@@ -101,6 +154,10 @@ class ItemDetailViewController: UIViewController {
                     stack.topAnchor.constraint(equalTo: guide.topAnchor, constant: 16),
                     stack.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16),
                     stack.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16),
+                    spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                    spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+                    errorStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                    errorStack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
                 ])
     }
 }
