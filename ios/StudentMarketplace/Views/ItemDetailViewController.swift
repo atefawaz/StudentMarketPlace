@@ -45,11 +45,28 @@ class ItemDetailViewController: UIViewController {
     
     private func populate(with item : Item ) {
         titleLabel.text = item.title
-        priceLabel.text = "\(item.price) EUR"
+        priceLabel.text = item.formattedPrice
         categoryLabel.text = "Category : \(item.category)"
         sellerLabel.text = "Sold by \(item.sellerName)"
-        dateLabel.text = "Posted : \(item.createdAt)"
+        dateLabel.text = "Posted \(relativeDate(from: item.createdAt))"
         descriptionLabel.text = item.description ?? "No description provided ."
+    }
+    
+    
+    // SMKT003 - TURNING TIMESTAMP INTO SOMETHING LIKE "2 HOURS AGO... "
+    
+    private func relativeDate(from raw : String) -> String {
+        let parser = DateFormatter()
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        parser.timeZone = TimeZone(identifier: "UTC")
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        
+        guard let date = parser.date(from: raw) else {
+                    return raw                                    
+                }
+                let formatter = RelativeDateTimeFormatter()
+                formatter.unitsStyle = .full
+                return formatter.localizedString(for: date, relativeTo: Date())
     }
     
     // Layout
