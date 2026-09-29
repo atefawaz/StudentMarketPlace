@@ -10,22 +10,68 @@ class ItemDetailViewController: UIViewController {
 
     /// Set by the presenting view controller before navigation.
     var itemId: Int = -1
-
+    
+    private let stack = UIStackView()
+    private let titleLabel = UILabel()
+    private let priceLabel = UILabel()
+    private let categoryLabel = UILabel()
+    private let sellerLabel = UILabel()
+    private let dateLabel = UILabel()
+    private let descriptionLabel = UILabel()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Item Detail"
         view.backgroundColor = .systemBackground
-
-        let placeholderLabel = UILabel()
-        placeholderLabel.text = "TODO: Load item #\(itemId) details here"
-        placeholderLabel.textAlignment = .center
-        placeholderLabel.textColor = .secondaryLabel
-        placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(placeholderLabel)
-
-        NSLayoutConstraint.activate([
-            placeholderLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            placeholderLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-        ])
+        setupUI()
+        loadItem()
+    }
+    
+//    Loading the data
+    
+    private func loadItem() {
+            APIClient.getItem(id: itemId) { [weak self] result in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    switch result {
+                    case .success(let item):
+                        self.populate(with: item)
+                    case .failure(let error):
+                        print("Failed to load item: \(error)")
+                    }
+                }
+            }
+        }
+    
+    private func populate(with item : Item ) {
+        titleLabel.text = item.title
+        priceLabel.text = "\(item.price) EUR"
+        categoryLabel.text = "Category : \(item.category)"
+        sellerLabel.text = "Sold by \(item.sellerName)"
+        dateLabel.text = "Posted : \(item.createdAt)"
+        descriptionLabel.text = item.description ?? "No description provided ."
+    }
+    
+    // Layout
+    private func setupUI() {
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        
+        titleLabel.font = .preferredFont(forTextStyle: .title1)
+        titleLabel.numberOfLines = 0
+        descriptionLabel.numberOfLines = 0
+        
+        [titleLabel, priceLabel, categoryLabel, sellerLabel, dateLabel, descriptionLabel]
+                    .forEach { stack.addArrangedSubview($0) }
+        
+        
+        view.addSubview(stack)
+                let guide = view.safeAreaLayoutGuide
+                NSLayoutConstraint.activate([
+                    stack.topAnchor.constraint(equalTo: guide.topAnchor, constant: 16),
+                    stack.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16),
+                    stack.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16),
+                ])
     }
 }
