@@ -7,7 +7,8 @@ Run with:
 
 import logging
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -45,6 +46,30 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+
+# ---------- Exception Handlers ----------
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors: dict[str, dict[str, list[str]]] = {}
+
+    for err in exc.errors():
+        loc = err["loc"]
+        # body or query
+        source = str(loc[0]) if loc else "request"
+
+        if err["type"] == "json_invalid":
+            field = "root"
+        else:
+            field = ".".join(str(p) for p in loc[1:]) or "root"
+
+        msg = err["msg"].removeprefix("Value error, ")
+        errors.setdefault(source, {}).setdefault(field, []).append(msg)
+
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Validation failed", "errors": errors},
+    )
 
 
 # ---------- Endpoints ----------
