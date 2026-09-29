@@ -6,7 +6,7 @@
 | C008 | Stored XSS in /admin | 79 | High | todo | |
 | C009 | IDOR on PATCH/DELETE /items/{id} | 639 | High | todo | |
 | C010 | Hardcoded secrets | 798 | Medium | todo | |
-| C011 | Plaintext passwords | 328 | High | todo | |
+| C011 | Plaintext passwords | 328 | High | DONE | |
 | C012 | Missing authentication | 306 | High | todo | |
 | C013 | CORS misconfiguration | 942 | Medium | todo | |
 | C014 | Debug mode exposure | 489 | Medium | todo | |
