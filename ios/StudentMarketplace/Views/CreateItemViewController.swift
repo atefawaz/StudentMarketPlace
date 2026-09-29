@@ -1,9 +1,6 @@
 import UIKit
 
 /// Form to create a new marketplace listing.
-///
-/// TODO: POST the new item using APIClient.createItem().
-/// TODO: On success, pop back to the list. On error, show an alert.
 class CreateItemViewController: UIViewController {
     
     // MARK: - UI
