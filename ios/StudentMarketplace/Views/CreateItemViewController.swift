@@ -2,7 +2,6 @@ import UIKit
 
 /// Form to create a new marketplace listing.
 ///
-/// TODO: Make the category field a dropdown field
 /// TODO: Validate that required fields are not empty and price > 0.
 /// TODO: POST the new item using APIClient.createItem().
 /// TODO: On success, pop back to the list. On error, show an alert.
@@ -143,50 +142,5 @@ class CreateItemViewController: UIViewController {
         print("priceText: ", price)
         print("category: ", category)
         print("seller: ", seller)
-    }
-}
-
-// MARK - FormTextField
-
-/// A text field with a rounded system-colored background and inner padding.
-private final class FormTextField: UITextField {
-    
-    private let horizontalPadding: CGFloat = 14
-    private let verticalPadding: CGFloat = 12
-    
-    /// A secondary, supporting initializer
-    convenience init(placeholder: String) {
-        self.init(frame: .zero)
-        self.placeholder = placeholder
-        backgroundColor = .secondarySystemBackground
-        textColor = .label
-        font = .preferredFont(forTextStyle: .body)
-        adjustsFontForContentSizeCategory = true
-        clearButtonMode = .whileEditing
-        layer.cornerRadius = 10
-        layer.cornerCurve = .continuous
-    }
-    
-    /// Height = one line of text + padding, never less than a comfortable 48pt tap target.
-    override var intrinsicContentSize: CGSize {
-        let size = super.intrinsicContentSize
-        return CGSize(width: size.width, height: max(size.height + 2 * verticalPadding, 48))
-    }
-    
-    /// Inset the text, the placeholder, and the text-while-editing horizontally
-    override func textRect(forBounds bounds: CGRect) -> CGRect {
-        super.textRect(forBounds: bounds).insetBy(dx: horizontalPadding, dy: 0)
-    }
-    
-    override func editingRect(forBounds bounds: CGRect) -> CGRect {
-        super.editingRect(forBounds: bounds).insetBy(dx: horizontalPadding, dy: 0)
-    }
- 
-    override func placeholderRect(forBounds bounds: CGRect) -> CGRect {
-        bounds.insetBy(dx: horizontalPadding, dy: 0)
-    }
- 
-    override func clearButtonRect(forBounds bounds: CGRect) -> CGRect {
-        super.clearButtonRect(forBounds: bounds).offsetBy(dx: -8, dy: 0)
     }
 }
