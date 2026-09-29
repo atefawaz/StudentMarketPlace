@@ -138,18 +138,20 @@ def get_all_categories() -> List[dict]:
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("""
-        SELECT 
-            i.category AS category_name,
-            COUNT(*) AS category_count
-        FROM items i
-        GROUP BY i.category
-        ORDER BY category_count DESC;
-    """)
+    try:
+        cursor.execute("""
+            SELECT 
+                i.category AS category_name,
+                COUNT(*) AS category_count
+            FROM items i
+            GROUP BY i.category
+            ORDER BY category_count DESC;
+        """)
 
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     serialized_rows = []
 
