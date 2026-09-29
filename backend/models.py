@@ -60,14 +60,24 @@ def _serialize_row(row) -> dict:
     return d
 
 
-def get_all_items() -> List[dict]:
+def get_all_items(category: Optional[str] = None) -> List[dict]:
     """Return every item, newest first."""
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM items ORDER BY created_at DESC")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    try:
+        if category:
+            cursor.execute(
+                "SELECT * FROM items WHERE category = %s ORDER BY created_at DESC",
+                (category,),
+            )
+        else:
+            cursor.execute("SELECT * FROM items ORDER BY created_at DESC")
+
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
+
     return [_serialize_row(r) for r in rows]
 
 
