@@ -107,6 +107,28 @@ class CreateItemViewController: UIViewController {
         scrollView.addGestureRecognizer(tap)
     }
     
+    // MARK - Submission Helpers
+    
+    private func setLoading(_ isLoading: Bool) {
+        submitButton.isEnabled = !isLoading
+        submitButton.configuration?.showsActivityIndicator = isLoading
+        submitButton.configuration?.title = isLoading ? "Submitting…" : "Submit"
+    }
+    
+    private func showErrorAlert(for error: Error) {
+        let message: String
+
+        if error is URLError {
+            message = "Check your internet connection and try again."
+        } else {
+            message = "Something went wrong while saving your item. Please try again."
+        }
+
+        let alert = UIAlertController(title: "Couldn't Create Item", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
     // MARK - Actions
     
     @objc private func dismissKeyboard() {
@@ -143,10 +165,34 @@ class CreateItemViewController: UIViewController {
             UIAccessibility.post(notification: .layoutChanged, argument: firstInvalid.field)
             return
         }
-
-        // Everything is valid.
-        // TODO: POST the item using APIClient.createItem().
-        // TODO: On success, pop back to the list. On error, show an alert.
-        print("Valid item:", title, description, price, category, seller)
+        
+        let request: CreateItemRequest = CreateItemRequest(
+            title: title,
+            description: description == "" ? nil : description,
+            price: NSDecimalNumber(decimal: price).doubleValue,
+            category: category,
+            imageUrl: nil,
+            sellerName: seller
+        )
+        
+        setLoading(true)
+        
+        APIClient.createItem(request) {
+            [weak self] result in
+            /// URLSession calls this on a background thread. UI updates must happen on the main thread.
+            DispatchQueue.main.async {
+                /// the screen was closed while the request was running/
+                guard let self else { return }
+                
+                self.setLoading(false)
+                
+                switch result {
+                case .success(let item):
+                    self.navigationController?.popViewController(animated: true)
+                case .failure(let error):
+                    self.showErrorAlert(for: error)
+                }
+            }
+        }
     }
 }
