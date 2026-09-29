@@ -2,7 +2,6 @@ import UIKit
 
 /// Form to create a new marketplace listing.
 ///
-/// TODO: Validate that required fields are not empty and price > 0.
 /// TODO: POST the new item using APIClient.createItem().
 /// TODO: On success, pop back to the list. On error, show an alert.
 class CreateItemViewController: UIViewController {
@@ -18,6 +17,19 @@ class CreateItemViewController: UIViewController {
     private let categoryField = FormDropdownField(placeholder: "Select a category", options: ItemCategory.allCases.map(\.rawValue))
     private let sellerField = FormTextField(placeholder: "Your name")
     private let submitButton = UIButton(type: .system)
+    
+    /// Each group = label + field + error message.
+    /// `lazy` lets these use the fields declared above.
+    private lazy var titleGroup = FormFieldGroup(label: "Title", field: titleField)
+    private lazy var descriptionGroup = FormFieldGroup(label: "Description", field: descriptionField)
+    private lazy var priceGroup = FormFieldGroup(label: "Price", field: priceField)
+    private lazy var categoryGroup = FormFieldGroup(label: "Category", field: categoryField)
+    private lazy var sellerGroup = FormFieldGroup(label: "Seller Name", field: sellerField)
+    
+    /// In the order they appear on screen.
+    private var allGroups: [FormFieldGroup] {
+        [titleGroup, descriptionGroup, priceGroup, categoryGroup, sellerGroup]
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -56,59 +68,37 @@ class CreateItemViewController: UIViewController {
     // MARK - Layout
     
     private func layoutForm() {
-        /// Each group is a small label sitting above its text field.
-        let groups = [
-            makeGroup(label: "Title", field: titleField),
-            makeGroup(label: "Description", field: descriptionField),
-            makeGroup(label: "Price", field: priceField),
-            makeGroup(label: "Category", field: categoryField),
-            makeGroup(label: "Seller Name", field: sellerField),
-        ]
-        
         formStack.axis = .vertical
         formStack.spacing = 20
         formStack.translatesAutoresizingMaskIntoConstraints = false
-        (groups + [submitButton]).forEach { formStack.addArrangedSubview($0) }
-        formStack.setCustomSpacing(32, after: groups.last!) /// add space before the button
+        allGroups.forEach { formStack.addArrangedSubview($0) }
+        formStack.addArrangedSubview(submitButton)
+        formStack.setCustomSpacing(32, after: sellerGroup) /// add space before the button
+
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.alwaysBounceVertical = true
         scrollView.keyboardDismissMode = .interactive
         scrollView.addSubview(formStack)
         view.addSubview(scrollView)
-        
+
         NSLayoutConstraint.activate([
             /// Scroll view fills the screen, but stops above the keyboard when it appears.
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor),
-            
+
             /// Content is exactly as wide as the scroll view: vertical scrolling only.
             scrollView.contentLayoutGuide.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
-            
+
             /// The stack defines the scrollable height.
             formStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 24),
             formStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -24),
-            
+
             /// Readable margins: respects notches/safe areas and caps the width on iPad.
             formStack.leadingAnchor.constraint(equalTo: view.readableContentGuide.leadingAnchor),
             formStack.trailingAnchor.constraint(equalTo: view.readableContentGuide.trailingAnchor),
         ])
-    }
-    
-    private func makeGroup(label text: String, field: UIView) -> UIStackView {
-        let label = UILabel()
-        label.text = text
-        label.font = .preferredFont(forTextStyle: .subheadline)
-        label.adjustsFontForContentSizeCategory = true
-        label.textColor = .secondaryLabel
-        
-        field.accessibilityLabel = text
-        
-        let group = UIStackView(arrangedSubviews: [label, field])
-        group.axis = .vertical
-        group.spacing = 6
-        return group
     }
     
     private func addKeyboardDismissal() {
@@ -124,23 +114,39 @@ class CreateItemViewController: UIViewController {
     }
     
     @objc private func submitItem() {
-        // TODO: read the field values, validate them, and create the item.
         view.endEditing(true)
-        
+
+        // Read the values.
         let title = titleField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let description = descriptionField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let category = categoryField.selectedOption ?? ""
         let seller = sellerField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        
         let price = Decimal(
             string: priceField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             locale: .current
         ) ?? 0
-        
-        print("title: ", title)
-        print("description: ", description)
-        print("priceText: ", price)
-        print("category: ", category)
-        print("seller: ", seller)
+
+        // Validate: a message means "invalid", nil means "OK".
+        titleGroup.errorMessage = title.isEmpty ? "Enter a title." : nil
+        priceGroup.errorMessage = price > 0 ? nil : "Enter a price greater than 0."
+        categoryGroup.errorMessage = category.isEmpty ? "Choose a category." : nil
+        sellerGroup.errorMessage = seller.isEmpty ? "Enter your name." : nil
+
+        // If something is wrong, point the user to the first problem and stop.
+        if let firstInvalid = allGroups.first(where: { $0.errorMessage != nil }) {
+            view.layoutIfNeeded() /// make sure the new error labels have their size
+            
+            let rect = firstInvalid.convert(firstInvalid.bounds, to: scrollView)
+            scrollView.scrollRectToVisible(rect, animated: true)
+
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            UIAccessibility.post(notification: .layoutChanged, argument: firstInvalid.field)
+            return
+        }
+
+        // Everything is valid.
+        // TODO: POST the item using APIClient.createItem().
+        // TODO: On success, pop back to the list. On error, show an alert.
+        print("Valid item:", title, description, price, category, seller)
     }
 }

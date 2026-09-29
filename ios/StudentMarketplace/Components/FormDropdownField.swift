@@ -12,7 +12,10 @@ public final class FormDropdownField: UIControl {
     
     /// nil until the user picks something mirroring an empty field.
     private(set) var selectedOption: String? {
-        didSet { refresh() }
+        didSet {
+            refresh()
+            sendActions(for: .valueChanged)
+        }
     }
     
     init(placeholder: String, options: [String]) {
