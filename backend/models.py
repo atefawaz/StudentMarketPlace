@@ -2,7 +2,7 @@
 Pydantic models and database query functions for items.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from database import get_db
 
@@ -13,6 +13,11 @@ from database import get_db
 
 class ItemCreate(BaseModel):
     """Schema used when creating a new item (POST body)."""
+
+    # strip leading and trailing whitespace before length is validated
+    # rejects unknown fields as well
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     price: float = Field(..., gt=0)
