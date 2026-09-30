@@ -19,3 +19,16 @@ enum ItemSortOption: String, CaseIterable {
     
     static let defaultOption: ItemSortOption = .dateDescending
 }
+
+extension ItemSortOption {
+    private static let storageKey = "itemSortOption"
+    
+    static var saved: ItemSortOption {
+        get {
+            UserDefaults.standard.string(forKey: storageKey).flatMap(ItemSortOption.init(rawValue:)) ?? defaultOption
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: storageKey)
+        }
+    }
+}

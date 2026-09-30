@@ -5,8 +5,11 @@ class ItemListViewController: UITableViewController {
 
     private var items: [Item] = []
     private var selectedCategory: String? // nil = "All"
-    private var selectedSort: ItemSortOption = .defaultOption {
-        didSet { updateSortButton() }
+    private var selectedSort: ItemSortOption = .saved {
+        didSet {
+            ItemSortOption.saved = selectedSort
+            updateSortButton()
+        }
     }
     
     private lazy var sortButton: UIBarButtonItem = {
@@ -34,6 +37,7 @@ class ItemListViewController: UITableViewController {
         )
         
         navigationItem.rightBarButtonItems = [addButton, sortButton]
+        updateSortButton()
         
         loadCategories()
     }
