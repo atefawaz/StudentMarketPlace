@@ -2,12 +2,11 @@
 
 | ID | Finding | CWE | Severity | Status | Evidence |
 |----|---------|-----|----------|--------|----------|
-| C007 | SQLi in /items/search | 89 | Critical | DONE | |
-| C008 | Stored XSS in /admin | 79 | High | DONE | |
-| C009 | IDOR on PATCH/DELETE /items/{id} | 639 | High | todo | |
-| C010 | Hardcoded secrets | 798 | Medium | todo | |
-| C011 | Plaintext passwords | 328 | High | DONE | |
-| C012 | Missing authentication | 306 | High | DONE | |
-| C013 | CORS misconfiguration | 942 | Medium | todo | |
-| C014 | Debug mode exposure | 489 | Medium | DONE | |
-| C015 | Verbose error handling | 209 | Low | todo | |
+| C002 | Endpoint inventory | — | Info | done | C002-endpoint-inventory.md |
+| C007 | SQLi in /items/search | 89 | Critical | done | C007 report + c007_sqli_poc.py |
+| C008 | Stored XSS in /admin | 79 | High | done | C008 report + popup screenshot |
+| C010 | Hardcoded secret key | 798 | Medium | done | C010 report |
+| C011 | Plaintext passwords | 328 | High | done | C011 report |
+| C012 | Missing authentication | 306 | High | done | C012 report + delete PoC |
+| C013 | Overly permissive CORS | 942 | Medium | done | C013 report |
+| C014 | Version info exposure | 200 | Low | done | C014 report + header PoC |
