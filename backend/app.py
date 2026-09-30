@@ -86,9 +86,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 @app.get("/items", response_model=list[ItemOut])
-def list_items(category: Optional[str] = None):
+def list_items(category: Optional[str] = None, sort: Optional[str] = None):
     """Return all marketplace items, newest first."""
-    return get_all_items(category)
+    return get_all_items(category, sort)
 
 
 @app.get("/items/{item_id}", response_model=ItemOut)

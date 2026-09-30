@@ -60,7 +60,7 @@ def _serialize_row(row) -> dict:
     return d
 
 
-def get_all_items(category: Optional[str] = None) -> List[dict]:
+def get_all_items(category: Optional[str] = None, sort: Optional[str] = None) -> List[dict]:
     """Return every item, newest first."""
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
