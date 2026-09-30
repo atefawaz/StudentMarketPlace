@@ -4,6 +4,7 @@ import UIKit
 class ItemListViewController: UITableViewController {
 
     private var items: [Item] = []
+    private var selectedCategory: String? // nil = "All"
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -28,12 +29,16 @@ class ItemListViewController: UITableViewController {
     // MARK: - Data loading
 
     private func loadItems() {
-        APIClient.getItems { [weak self] result in
+        let requestedCategory = selectedCategory
+
+        APIClient.getItems(category: requestedCategory) { [weak self] result in
             DispatchQueue.main.async {
+                guard let self, requestedCategory == self.selectedCategory else { return }
+
                 switch result {
                 case .success(let items):
-                    self?.items = items
-                    self?.tableView.reloadData()
+                    self.items = items
+                    self.tableView.reloadData()
                 case .failure(let error):
                     let alert = UIAlertController(
                         title: "Error",
@@ -41,7 +46,7 @@ class ItemListViewController: UITableViewController {
                         preferredStyle: .alert
                     )
                     alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    self?.present(alert, animated: true)
+                    self.present(alert, animated: true)
                 }
             }
         }
@@ -54,6 +59,10 @@ class ItemListViewController: UITableViewController {
                 
                 let row = CategoryChipRowView(frame: .zero)
                 row.setCategories(categories)
+                row.onCategorySelected = { [weak self] category in
+                    self?.selectedCategory = category
+                    self?.loadItems()
+                }
                 self?.tableView.tableHeaderView = row
             }
         }

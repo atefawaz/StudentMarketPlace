@@ -2,8 +2,12 @@ import UIKit
 
 final class CategoryChipRowView: UIView {
     
+    /// Called when a chip is tapped. `nil` means "All" (no filter).
+    var onCategorySelected: ((String?) -> Void)?
+    
     private let scrollView = UIScrollView()
     private let stackView = UIStackView()
+    private var chips: [CategoryChipButton] = []
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -16,16 +20,40 @@ final class CategoryChipRowView: UIView {
     
     func setCategories(_ categories: [ItemCategory]) {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        chips.removeAll()
+        
+        let allChip = addChip(title: "All", category: nil)
+        allChip.isSelected = true
         
         for category in categories {
-            let chip = CategoryChipButton(title: category.name)
-            chip.isUserInteractionEnabled = false
-            stackView.addArrangedSubview(chip)
+            addChip(title: category.name, category: category.name)
         }
     }
     
+    @discardableResult
+    private func addChip(title: String, category: String?) -> CategoryChipButton {
+        let chip = CategoryChipButton(title: title)
+        chip.addAction(UIAction { [weak self, weak chip] _ in
+                guard let self, let chip, !chip.isSelected else { return }
+                self.select(chip)
+                self.onCategorySelected?(category)
+            }, for: .touchUpInside
+        )
+        
+        chips.append(chip)
+        stackView.addArrangedSubview(chip)
+        return chip
+    }
+    
+    private func select(_ selectedChip: CategoryChipButton) {
+        chips.forEach{ $0.isSelected = ($0 == selectedChip) }
+        
+        let frame = selectedChip.convert(selectedChip.bounds, to: scrollView)
+        scrollView.scrollRectToVisible(frame.insetBy(dx: -16, dy: 0), animated: true)
+    }
+    
     private func setUp() {
-        scrollView.showsVerticalScrollIndicator = false
+        scrollView.showsHorizontalScrollIndicator = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
         
