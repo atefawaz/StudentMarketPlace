@@ -30,15 +30,19 @@ class APIClient {
 
     /// Fetch marketplace items, optionally filtered by category.
     static func getItems(category: String? = nil,
+                         order_by: String? = nil,
                          completion: @escaping (Result<[Item], Error>) -> Void) {
         guard var components = URLComponents(string: "\(baseURL)/items") else {
             completion(.failure(URLError(.badURL)))
             return
         }
 
-        if let category = category {
-            components.queryItems = [URLQueryItem(name: "category", value: category)]
-        }
+        var queryItems: [URLQueryItem] = []
+        
+        if let category { queryItems.append(URLQueryItem(name: "category", value: category)) }
+        if let order_by { queryItems.append(URLQueryItem(name: "sort", value: order_by)) }
+        
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
 
         guard let url = components.url else {
             completion(.failure(URLError(.badURL)))
