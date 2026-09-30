@@ -22,17 +22,18 @@ final class CategoryChipRowView: UIView {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         chips.removeAll()
         
-        let allChip = addChip(title: "All", category: nil)
+        let total = categories.reduce(0) { $0 + $1.itemCount }
+        let allChip = addChip(title: "All", count: total, category: nil)
         allChip.isSelected = true
         
         for category in categories {
-            addChip(title: category.name, category: category.name)
+            addChip(title: category.name, count: category.itemCount, category: category.name)
         }
     }
     
     @discardableResult
-    private func addChip(title: String, category: String?) -> CategoryChipButton {
-        let chip = CategoryChipButton(title: title)
+    private func addChip(title: String, count: Int, category: String?) -> CategoryChipButton {
+        let chip = CategoryChipButton(title: title, count: count)
         chip.addAction(UIAction { [weak self, weak chip] _ in
                 guard let self, let chip, !chip.isSelected else { return }
                 self.select(chip)
