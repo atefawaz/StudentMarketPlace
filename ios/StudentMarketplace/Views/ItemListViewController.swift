@@ -4,6 +4,7 @@ import UIKit
 class ItemListViewController: UITableViewController {
 
     private var items: [Item] = []
+    private var selectedCategory: String? // nil = "All"
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -16,6 +17,8 @@ class ItemListViewController: UITableViewController {
             target: self,
             action: #selector(openCreateItem)
         )
+        
+        loadCategories()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -26,12 +29,16 @@ class ItemListViewController: UITableViewController {
     // MARK: - Data loading
 
     private func loadItems() {
-        APIClient.getItems { [weak self] result in
+        let requestedCategory = selectedCategory
+
+        APIClient.getItems(category: requestedCategory) { [weak self] result in
             DispatchQueue.main.async {
+                guard let self, requestedCategory == self.selectedCategory else { return }
+
                 switch result {
                 case .success(let items):
-                    self?.items = items
-                    self?.tableView.reloadData()
+                    self.items = items
+                    self.tableView.reloadData()
                 case .failure(let error):
                     let alert = UIAlertController(
                         title: "Error",
@@ -39,8 +46,24 @@ class ItemListViewController: UITableViewController {
                         preferredStyle: .alert
                     )
                     alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    self?.present(alert, animated: true)
+                    self.present(alert, animated: true)
                 }
+            }
+        }
+    }
+    
+    private func loadCategories() {
+        APIClient.getCategories { [weak self] result in
+            DispatchQueue.main.async {
+                guard case .success(let categories) = result, !categories.isEmpty else { return }
+                
+                let row = CategoryChipRowView(frame: .zero)
+                row.setCategories(categories)
+                row.onCategorySelected = { [weak self] category in
+                    self?.selectedCategory = category
+                    self?.loadItems()
+                }
+                self?.tableView.tableHeaderView = row
             }
         }
     }
@@ -67,7 +90,22 @@ class ItemListViewController: UITableViewController {
         cell.alpha = item.isSold ? 0.5 : 1.0
         return cell
     }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard let header = tableView.tableHeaderView else { return }
 
+        let size = header.systemLayoutSizeFitting(
+            CGSize(width: tableView.bounds.width, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        )
+        if header.frame.height != size.height {
+            header.frame.size.height = size.height
+            tableView.tableHeaderView = header // re-assign so the table picks up the new height
+        }
+    }
+    
     // MARK: - UITableViewDelegate
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

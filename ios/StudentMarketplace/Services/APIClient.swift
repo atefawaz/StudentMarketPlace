@@ -28,16 +28,32 @@ class APIClient {
 
     // MARK: - GET /items
 
-    /// Fetch all marketplace items.
-    static func getItems(completion: @escaping (Result<[Item], Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/items") else { return }
+    /// Fetch marketplace items, optionally filtered by category.
+    static func getItems(category: String? = nil,
+                         completion: @escaping (Result<[Item], Error>) -> Void) {
+        guard var components = URLComponents(string: "\(baseURL)/items") else {
+            completion(.failure(URLError(.badURL)))
+            return
+        }
+
+        if let category = category {
+            components.queryItems = [URLQueryItem(name: "category", value: category)]
+        }
+
+        guard let url = components.url else {
+            completion(.failure(URLError(.badURL)))
+            return
+        }
 
         URLSession.shared.dataTask(with: url) { data, _, error in
             if let error = error {
                 completion(.failure(error))
                 return
             }
-            guard let data = data else { return }
+            guard let data = data else {
+                completion(.failure(URLError(.badServerResponse)))
+                return
+            }
             do {
                 let items = try JSONDecoder().decode([Item].self, from: data)
                 completion(.success(items))
@@ -102,6 +118,26 @@ class APIClient {
             do {
                 let item = try JSONDecoder().decode(Item.self, from: data)
                 completion(.success(item))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+    
+    // MARK: - GET /categories
+    
+    static func getCategories(completion: @escaping (Result<[ItemCategory], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/categories") else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            guard let data = data else { return }
+            do {
+                let categories = try JSONDecoder().decode([ItemCategory].self, from: data)
+                completion(.success(categories))
             } catch {
                 completion(.failure(error))
             }

@@ -38,9 +38,14 @@ class ItemOut(BaseModel):
     created_at: str
     is_sold: bool
 
+class CategoryOut(BaseModel):
+    """Category schema returned to clients."""
+    category_name: str
+    category_count: int
+
 
 # ---------------------------------------------------------------------------
-# DB helpers
+# Items DB helpers
 # ---------------------------------------------------------------------------
 
 def _serialize_row(row) -> dict:
@@ -55,14 +60,24 @@ def _serialize_row(row) -> dict:
     return d
 
 
-def get_all_items() -> List[dict]:
+def get_all_items(category: Optional[str] = None) -> List[dict]:
     """Return every item, newest first."""
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM items ORDER BY created_at DESC")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    try:
+        if category:
+            cursor.execute(
+                "SELECT * FROM items WHERE category = %s ORDER BY created_at DESC",
+                (category,),
+            )
+        else:
+            cursor.execute("SELECT * FROM items ORDER BY created_at DESC")
+
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
+
     return [_serialize_row(r) for r in rows]
 
 
@@ -104,3 +119,46 @@ def create_item(item: ItemCreate) -> dict:
     cursor.close()
     conn.close()
     return _serialize_row(row)
+
+# ---------------------------------------------------------------------------
+# Category DB helpers
+# ---------------------------------------------------------------------------
+
+def _category_serialize_row(row) -> Optional[dict]:
+    """Convert a category row dict"""
+    if row is None:
+        return None
+
+    d = dict(row)
+
+    return d
+
+def get_all_categories() -> List[dict]:
+    """Return every category, with the highest count first."""
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT 
+                i.category AS category_name,
+                COUNT(*) AS category_count
+            FROM items i
+            GROUP BY i.category
+            ORDER BY category_count DESC;
+        """)
+
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
+
+    serialized_rows = []
+
+    for r in rows:
+        serialized_row = _category_serialize_row(r)
+
+        if serialized_row:
+            serialized_rows.append(serialized_row)
+
+    return serialized_rows
