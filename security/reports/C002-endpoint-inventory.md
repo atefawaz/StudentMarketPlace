@@ -10,8 +10,8 @@ Issue: #42
 | GET    | /items/search    | q          | none                | high       |
 | GET    | /admin           | none       | none                | high       |
 | DELETE | /items/{item_id} | item_id    | none                | high       |
-| PATCH  | /items/{item_id} | item_id + raw JSON body | none  | high       |
-| POST   | /sellers/register| name, email| none               | low        |
+| PATCH  | /items/{item_id} | item_id + raw JSON body | none   | high       |
+| POST   | /sellers/register| name, email| none                | low        |
 
 ## Notes
 - No endpoint requires authentication.
