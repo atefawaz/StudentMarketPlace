@@ -2,6 +2,7 @@
 
 | ID | Finding | CWE | Severity | Status | Evidence |
 |----|---------|-----|----------|--------|----------|
+| C001 | Architecture + trust boundaries | — | Info | done | C001-architecture.md + .png |
 | C002 | Endpoint inventory | — | Info | done | C002-endpoint-inventory.md |
 | C007 | SQLi in /items/search | 89 | Critical | done | C007 report + c007_sqli_poc.py |
 | C008 | Stored XSS in /admin | 79 | High | done | C008 report + popup screenshot |
