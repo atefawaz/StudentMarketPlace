@@ -107,4 +107,24 @@ class APIClient {
             }
         }.resume()
     }
+    
+    // MARK: - GET /categories
+    
+    static func getCategories(completion: @escaping (Result<[ItemCategory], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/categories") else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            guard let data = data else { return }
+            do {
+                let categories = try JSONDecoder().decode([ItemCategory].self, from: data)
+                completion(.success(categories))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
 }

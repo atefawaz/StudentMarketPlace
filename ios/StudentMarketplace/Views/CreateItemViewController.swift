@@ -11,7 +11,7 @@ class CreateItemViewController: UIViewController {
     private let titleField = FormTextField(placeholder: "e.g. Vintage road bike")
     private let descriptionField = FormTextField(placeholder: "Describe your item")
     private let priceField = FormTextField(placeholder: "0.00")
-    private let categoryField = FormDropdownField(placeholder: "Select a category", options: ItemCategory.allCases.map(\.rawValue))
+    private let categoryField = FormDropdownField(placeholder: "Select a category", options: ItemCategoryOptions.allCases.map(\.rawValue))
     private let sellerField = FormTextField(placeholder: "Your name")
     private let submitButton = UIButton(type: .system)
     
