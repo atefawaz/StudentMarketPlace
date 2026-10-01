@@ -12,7 +12,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from dotenv import load_dotenv
 from typing import Optional
+
+from utilities import get_required_env
+
+load_dotenv()
 
 from database import init_db, get_db
 from models import (
@@ -27,7 +32,7 @@ from models import (
     ItemSoldUpdate
 )
 
-SECRET_KEY = "super-secret-key-123"
+SECRET_KEY = get_required_env("SECRET_KEY")
 
 app = FastAPI(
     title="Student Marketplace API",
