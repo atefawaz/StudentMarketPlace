@@ -44,6 +44,9 @@ class APIClient {
             completion(.failure(URLError(.badURL)))
             return
         }
+        
+        var request = URLRequest(url: url)
+                request.cachePolicy = .reloadIgnoringLocalCacheData
 
         URLSession.shared.dataTask(with: url) { data, _, error in
             if let error = error {
