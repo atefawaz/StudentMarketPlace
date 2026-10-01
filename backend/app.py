@@ -10,7 +10,6 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from typing import Optional
 import html as html_lib
@@ -37,14 +36,7 @@ app = FastAPI(
 )
 
 
-class PoweredByMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        response = await call_next(request)
-        response.headers["X-Powered-By"] = "FastAPI/0.104.1 Python/3.11"
-        return response
 
-
-app.add_middleware(PoweredByMiddleware)
 
 # Allow all origins so the Android / iOS emulators can reach the server.
 app.add_middleware(
