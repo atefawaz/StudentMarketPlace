@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from models import get_seller_by_id
+from models import get_seller_by_id, get_item_by_id
 from utilities import get_required_env
 
 load_dotenv()
@@ -109,3 +109,19 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
         raise _unauthorized("Invalid token")
 
     return seller
+
+# ---------------------------------------------------------------------------
+# Authorization
+# ---------------------------------------------------------------------------
+
+def require_item_owner(item_id: int, current_seller: dict = Depends(get_current_user)) -> None:
+    """
+    FastAPI dependency for routes with an {item_id} path parameter.
+    401 if the token is missing or invalid (raised by get_current_user),
+    404 if the item doesn't exist, 403 if it belongs to another seller.
+    """
+    item = get_item_by_id(item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item["seller_id"] != current_seller["id"]:
+        raise HTTPException(status_code=403, detail="You do not own this item")

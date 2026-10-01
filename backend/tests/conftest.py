@@ -83,3 +83,36 @@ def client():
     """Return a FastAPI TestClient."""
     from app import app
     return TestClient(app)
+
+
+@pytest.fixture()
+def make_seller(client):
+    """
+    Factory: register and log in a seller, returning (seller, auth_headers).
+
+    Call it more than once with different usernames to get several sellers,
+    e.g. to check that one seller can't touch another seller's items.
+    """
+
+    def _make_seller(username: str = "owner_test"):
+        password = "correct horse battery staple"
+        response = client.post(
+            "/auth/register",
+            json={
+                "username": username,
+                "password": password,
+                "display_name": f"Display {username}",
+                "email": f"{username}@epita.fr",
+            },
+        )
+        assert response.status_code == 201, response.text
+        seller = response.json()
+
+        response = client.post(
+            "/auth/login", json={"username": username, "password": password}
+        )
+        assert response.status_code == 200, response.text
+        headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+        return seller, headers
+
+    return _make_seller

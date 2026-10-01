@@ -44,7 +44,6 @@ class ItemCreate(BaseModel):
     price: float = Field(..., gt=0)
     category: str = Field(..., min_length=1)
     image_url: Optional[str] = None
-    seller_name: str = Field(..., min_length=1)
 
 
 class ItemOut(BaseModel):
@@ -56,6 +55,7 @@ class ItemOut(BaseModel):
     category: str
     image_url: Optional[str]
     seller_name: str
+    seller_id: int
     created_at: str
     is_sold: bool
 
@@ -179,14 +179,14 @@ def get_item_by_id(item_id: int) -> Optional[dict]:
     return _serialize_row(row)
 
 
-def create_item(item: ItemCreate) -> dict:
+def create_item(item: ItemCreate, seller: dict) -> dict:
     """Insert a new item and return it (with generated id and timestamp)."""
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
     cursor.execute(
         """
-        INSERT INTO items (title, description, price, category, image_url, seller_name)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO items (title, description, price, category, image_url, seller_name, seller_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
         (
             item.title,
@@ -194,7 +194,8 @@ def create_item(item: ItemCreate) -> dict:
             item.price,
             item.category,
             item.image_url,
-            item.seller_name,
+            seller["display_name"],
+            seller["id"],
         ),
     )
     conn.commit()

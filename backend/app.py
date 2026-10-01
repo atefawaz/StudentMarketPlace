@@ -45,6 +45,7 @@ from auth import (
     get_current_user,
     hash_password,
     verify_password,
+    require_item_owner,
 )
 
 app = FastAPI(
@@ -121,9 +122,9 @@ def item_detail(item_id: int):
 
 
 @app.post("/items", response_model=ItemOut, status_code=201)
-def add_item(item: ItemCreate):
+def add_item(item: ItemCreate, current_seller: dict = Depends(get_current_user)):
     """Create a new marketplace listing."""
-    return create_item(item)
+    return create_item(item, current_seller)
 
 # ---------- Category Endpoints ----------
 
@@ -163,9 +164,9 @@ def admin_page():
     return HTMLResponse(content=html)
 
 
-# ---------- Delete item (no auth) ----------
+# ---------- Delete item (owner only) ----------
 
-@app.delete("/items/{item_id}")
+@app.delete("/items/{item_id}", dependencies=[Depends(require_item_owner)])
 def delete_item(item_id: int):
     conn = get_db()
     cursor = conn.cursor()
@@ -177,7 +178,7 @@ def delete_item(item_id: int):
 
 
 
-@app.patch("/items/{item_id}" , response_model=ItemOut)
+@app.patch("/items/{item_id}" , response_model=ItemOut, dependencies=[Depends(require_item_owner)])
 def update_item_sold(item_id: int, payload: ItemSoldUpdate):
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
