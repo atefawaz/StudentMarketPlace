@@ -7,7 +7,7 @@
 | C002 | Endpoint inventory | done | C002-endpoint-inventory.md |
 | C003 | STRIDE analysis | in progress | C003-stride.md |
 | C004 | Attack surface mapping | done | C004-attack-surface.md |
-| C005 | Attack tree | todo | — |
+| C005 |C005-Attack-Tree | Attack tree | Done |C005-attack-tree.md|
 | C006 | Threat assessment (top 5) | todo | — |
 
 ## Findings (Phase 2 — code review)
