@@ -6,7 +6,7 @@ Run with:
 """
 
 import logging
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,15 +24,28 @@ from models import (
     ItemCreate, 
     ItemOut, 
     CategoryOut,
+    ItemSoldUpdate,
+    LoginRequest,
+    RegisterRequest,
+    SellerOut,
+    TokenOut,
+    UsernameTakenError,
     _serialize_row, 
     get_all_items, 
     get_item_by_id, 
     create_item, 
     get_all_categories,
-    ItemSoldUpdate
+    create_seller,
+    get_seller_by_username,
 )
 
-SECRET_KEY = get_required_env("SECRET_KEY")
+from auth import (
+    DUMMY_HASH,
+    create_token,
+    get_current_user,
+    hash_password,
+    verify_password,
+)
 
 app = FastAPI(
     title="Student Marketplace API",
@@ -178,13 +191,36 @@ def update_item_sold(item_id: int, payload: ItemSoldUpdate):
         raise HTTPException(status_code=404, detail="Item not found")
     return _serialize_row(row)
 
+# ---------- Auth Endpoints ----------
 
-  
+@app.post("/auth/register", response_model=SellerOut, status_code=201)
+def register(data: RegisterRequest):
+    try:
+        return create_seller(
+            username=data.username,
+            password_hash=hash_password(data.password),
+            display_name=data.display_name,
+            email=data.email,
+        )
+    except UsernameTakenError:
+        raise HTTPException(status_code=409, detail="Username already taken")
 
+@app.post("/auth/login", response_model=TokenOut)
+def login(data: LoginRequest):
+    seller = get_seller_by_username(data.username)
+    password_ok = verify_password(
+        data.password,
+        seller["password_hash"] if seller else DUMMY_HASH
+    )
 
-@app.post("/sellers/register")
-def register_seller(data: dict):
-    name = data.get("name", "")
-    email = data.get("email", "")
-    logging.info(f"New seller registered: {name} ({email})")
-    return {"message": f"Seller {name} registered"}
+    if seller is None or not password_ok:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return TokenOut(access_token=create_token(seller["id"]))
+
+@app.get("/auth/me", response_model=SellerOut)
+def me(current_seller: dict = Depends(get_current_user)):
+    return current_seller

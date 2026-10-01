@@ -2,9 +2,19 @@
 Pydantic models and database query functions for items.
 """
 
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+
+from pydantic import (
+    BaseModel,
+    Field,
+    ConfigDict,
+    EmailStr,
+    StringConstraints,
+    field_validator
+)
+from typing import Optional, List, Annotated
 from database import get_db
+
+from mysql.connector import IntegrityError, errorcode
 
 # ---------------------------------------------------------------------------
 # Helper Constants
@@ -59,6 +69,60 @@ class ItemSoldUpdate(BaseModel):
     """Schema used when updating an item to mark it as sold (PATCH body)."""
     is_sold: bool 
 
+class RegisterRequest(BaseModel):
+    """Body of POST /auth/register."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    username: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=3, max_length=50, pattern=r"^[A-Za-z0-9_]+$")
+    ]
+    password: str = Field(..., min_length=8)
+    display_name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+    ]
+    email: EmailStr
+
+    @field_validator("username")
+    @classmethod
+    def lowercase_username(cls, v: str) -> str:
+        return v.lower()
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, v:str) -> str:
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 bytes")
+        return v
+
+class LoginRequest(BaseModel):
+    """Body of POST /auth/login."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    username: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+    ]
+    password: str = Field(..., min_length=1, max_length=255)
+
+    @field_validator("username")
+    @classmethod
+    def lowercase_username(cls, v: str) -> str:
+        return v.lower()
+
+class SellerOut(BaseModel):
+    """Seller schema returned to clients"""
+
+    id: int
+    username: str
+    display_name: str
+    email: str
+    created_at: str
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 # ---------------------------------------------------------------------------
 # Items DB helpers
@@ -183,3 +247,80 @@ def get_all_categories() -> List[dict]:
             serialized_rows.append(serialized_row)
 
     return serialized_rows
+
+# ---------------------------------------------------------------------------
+# Sellers DB helpers
+# ---------------------------------------------------------------------------
+
+class UsernameTakenError(Exception):
+    """Raised when the username violates the UNIQUE constraint."""
+
+PUBLIC_COLUMNS = "id, username, display_name, email, created_at"
+
+def _serialize_seller(row) -> Optional[dict]:
+    if row is None:
+        return None
+    d = dict(row)
+    if hasattr(d.get("created_at"), "isoformat"):
+        d["created_at"] = d["created_at"].isoformat()
+    return d
+
+def create_seller(username: str, password_hash: str, display_name: str, email: str) -> dict:
+    """Insert a seller and return it (without the hash)."""
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            INSERT INTO sellers (username, password_hash, display_name, email)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (username, password_hash, display_name, email),
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
+        cursor.execute(f"SELECT {PUBLIC_COLUMNS} FROM sellers WHERE id = %s", (new_id,))
+        row = cursor.fetchone()
+    except IntegrityError as exc:
+        # Relying on the UNIQUE constraint (instead of "check, then insert")
+        # avoids a race between two simultaneous registrations.
+        if exc.errno == errorcode.ER_DUP_ENTRY:
+            raise UsernameTakenError(username) from exc
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+    serialized_seller = _serialize_seller(row)
+
+    if serialized_seller is None:
+        serialized_seller = dict()
+    
+    return serialized_seller
+
+def get_seller_by_username(username: str) -> Optional[dict]:
+    """Return a seller INCLUDING password_hash. Only use this for login."""
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            f"SELECT {PUBLIC_COLUMNS}, password_hash FROM sellers WHERE username = %s",
+            (username,),
+        )
+        row = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
+    return _serialize_seller(row)
+
+def get_seller_by_id(seller_id: int) -> Optional[dict]:
+    """Return a seller without the password hash."""
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(f"SELECT {PUBLIC_COLUMNS} FROM sellers WHERE id = %s", (seller_id,))
+        row = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
+    return _serialize_seller(row)

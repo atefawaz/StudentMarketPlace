@@ -3,7 +3,13 @@ Pytest fixtures for the Student Marketplace backend tests.
 """
 
 import os
+import secrets
 import sys
+
+# Must be set before `app` (and therefore auth.py) is imported: auth.py reads
+# SECRET_KEY at import time, and load_dotenv() never overrides an existing variable.
+os.environ["SECRET_KEY"] = secrets.token_hex(32)
+
 import pytest
 import mysql.connector
 from fastapi.testclient import TestClient
@@ -31,29 +37,32 @@ def test_database():
     database.DB_CONFIG["database"] = TEST_DB_NAME
     database.init_db()
 
-    # Seed a few items for read-oriented tests
     db = database.get_db()
     cur = db.cursor()
+
+    # items.seller_id is NOT NULL, so the seed items need an owner.
+    # "!" is not a valid bcrypt hash, so nobody can log in as this seller.
     cur.execute(
         """
-        INSERT INTO items (title, description, price, category, seller_name, is_sold)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO sellers (username, password_hash, display_name, email)
+        VALUES (%s, %s, %s, %s)
         """,
-        ('Test Book', 'A test book', 12.50, 'Books', 'Alice', 0),
+        ("seed_owner", "!", "Seed Owner", "seed.owner@epita.fr"),
     )
-    cur.execute(
+    seed_seller_id = cur.lastrowid
+
+    # Seed a few items for read-oriented tests
+    cur.executemany(
         """
-        INSERT INTO items (title, description, price, category, seller_name, is_sold)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO items
+            (title, description, price, category, seller_name, seller_id, is_sold)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
-        ('Test Laptop', 'A test laptop', 350.00, 'Electronics', 'Bob', 0),
-    )
-    cur.execute(
-        """
-        INSERT INTO items (title, description, price, category, seller_name, is_sold)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        """,
-        ('Sold Chair', 'Already sold', 80.00, 'Furniture', 'Chloe', 1),
+        [
+            ("Test Book", "A test book", 12.50, "Books", "Alice", seed_seller_id, 0),
+            ("Test Laptop", "A test laptop", 350.00, "Electronics", "Bob", seed_seller_id, 0),
+            ("Sold Chair", "Already sold", 80.00, "Furniture", "Chloe", seed_seller_id, 1),
+        ],
     )
     db.commit()
     cur.close()
