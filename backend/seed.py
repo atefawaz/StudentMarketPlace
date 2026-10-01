@@ -203,92 +203,145 @@ ITEMS = [
 SELLERS = [
     {
         "username": "admin",
+        "display_name": "Admin",
         "email": "admin@marketplace.epita.fr",
         "password_env": "SEED_ADMIN_PASSWORD",
     },
     {
         "username": "alice_martin",
+        "display_name": "Alice Martin",
         "email": "alice.martin@epita.fr",
         "password_env": "SEED_ALICE_PASSWORD",
     },
     {
         "username": "lucas_dupont",
+        "display_name": "Lucas Dupont",
         "email": "lucas.dupont@epita.fr",
         "password_env": "SEED_LUCAS_PASSWORD",
+    },
+    {
+        "username": "emma_bernard",
+        "display_name": "Emma Bernard",
+        "email": "emma.bernard@epita.fr",
+        "password_env": "SEED_DEFAULT_PASSWORD",
+    },
+    {
+        "username": "hugo_leroy",
+        "display_name": "Hugo Leroy",
+        "email": "hugo.leroy@epita.fr",
+        "password_env": "SEED_DEFAULT_PASSWORD",
+    },
+    {
+        "username": "chloe_moreau",
+        "display_name": "Chloe Moreau",
+        "email": "chloe.moreau@epita.fr",
+        "password_env": "SEED_DEFAULT_PASSWORD",
+    },
+    {
+        "username": "nathan_petit",
+        "display_name": "Nathan Petit",
+        "email": "nathan.petit@epita.fr",
+        "password_env": "SEED_DEFAULT_PASSWORD",
+    },
+    {
+        "username": "lea_roux",
+        "display_name": "Lea Roux",
+        "email": "lea.roux@epita.fr",
+        "password_env": "SEED_DEFAULT_PASSWORD",
     },
 ]
 
 def seed():
-    init_db()
-    conn = get_db()
-    cursor = conn.cursor()
-
-    # Only seed if the table is empty
-    cursor.execute("SELECT COUNT(*) FROM items")
-    count = cursor.fetchone()[0]
-    if count > 0:
-        print(f"Database already contains {count} items — skipping seed.")
-        cursor.close()
-        conn.close()
-        return
-
-    for item in ITEMS:
-        cursor.execute(
-            """
-            INSERT INTO items (title, description, price, category, image_url, seller_name, is_sold)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """,
-            (
-                item["title"],
-                item["description"],
-                item["price"],
-                item["category"],
-                item["image_url"],
-                item["seller_name"],
-                item["is_sold"],
-            ),
-        )
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print(f"Seeded {len(ITEMS)} items into the database.")
-
-
-def seed_users():
-    prepared = [
-        (
-            s["username"],
-            hash_password(get_required_env(s["password_env"])),
-            s["email"],
-        )
-        for s in SELLERS
-    ]
-
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("DROP TABLE IF EXISTS sellers")
-        cursor.execute("""
-            CREATE TABLE sellers (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(255) NOT NULL UNIQUE,
-                password_hash VARCHAR(255) NOT NULL,
-                email VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        # Only seed if the table is empty
+        cursor.execute("SELECT COUNT(*) FROM items")
+        count = cursor.fetchone()[0]
+        if count > 0:
+            print(f"Database already contains {count} items — skipping seed.")
+            return
+
+        cursor.execute("SELECT display_name, id FROM sellers")
+        seller_ids = dict(cursor.fetchall())
+
+        # Resolve every seller before inserting, so a typo can't leave a partial seed
+        rows = []
+        for item in ITEMS:
+            seller_id = seller_ids.get(item["seller_name"])
+            if seller_id is None:
+                print(
+                    f"No seller with display_name {item['seller_name']!r} ",
+                    f"(needed by item {item['title']!r}). Add it to SELLERS."
+                )
+                continue
+            rows.append(
+                (
+                    item["title"],
+                    item["description"],
+                    item["price"],
+                    item["category"],
+                    item["image_url"],
+                    item["seller_name"],
+                    seller_id,
+                    item["is_sold"],
+                )
             )
-        """)
+
         cursor.executemany(
-            "INSERT INTO sellers (username, password_hash, email) VALUES (%s, %s, %s)",
-            prepared,
+            """
+            INSERT INTO items
+                (title, description, price, category, image_url,
+                 seller_name, seller_id, is_sold)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            rows,
         )
         conn.commit()
-        print(f"Seeded {len(prepared)} sellers.")
+        print(f"Seeded {len(rows)} items into the database.")
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def seed_users():
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT username FROM sellers")
+        existing = {row[0] for row in cursor.fetchall()}
+
+        # Read env vars and hash before writing anything
+        to_insert = [
+            (
+                s["username"],
+                hash_password(get_required_env(s["password_env"])),
+                s["display_name"],
+                s["email"],
+            )
+            for s in SELLERS
+            if s["username"] not in existing
+        ]
+
+        if not to_insert:
+            print("All sellers already exist — skipping seed.")
+            return
+
+        cursor.executemany(
+            """
+            INSERT INTO sellers (username, password_hash, display_name, email)
+            VALUES (%s, %s, %s, %s)
+            """,
+            to_insert,
+        )
+        conn.commit()
+        print(f"Seeded {len(to_insert)} sellers.")
     finally:
         cursor.close()
         conn.close()
 
 
 if __name__ == "__main__":
-    seed()
+    init_db()
     seed_users()
+    seed()
