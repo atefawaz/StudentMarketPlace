@@ -55,6 +55,11 @@ class CategoryOut(BaseModel):
     category_count: int
 
 
+class ItemSoldUpdate(BaseModel):
+    """Schema used when updating an item to mark it as sold (PATCH body)."""
+    is_sold: bool 
+
+
 # ---------------------------------------------------------------------------
 # Items DB helpers
 # ---------------------------------------------------------------------------

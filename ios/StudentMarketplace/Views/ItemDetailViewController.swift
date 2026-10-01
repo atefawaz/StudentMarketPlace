@@ -19,6 +19,8 @@ class ItemDetailViewController: UIViewController {
     private let dateLabel = UILabel()
     private let descriptionLabel = UILabel()
     private let soldBadge = UILabel()
+    private let soldButton = UIButton(type: .system)
+    private var currentItem: Item?
     
     private let spinner = UIActivityIndicatorView(style: .large)
     private let errorLabel = UILabel()
@@ -57,6 +59,7 @@ class ItemDetailViewController: UIViewController {
         }
     
     private func populate(with item : Item ) {
+        currentItem = item
         titleLabel.text = item.title
         priceLabel.text = item.formattedPrice
         categoryLabel.text = "Category : \(item.category)"
@@ -64,7 +67,37 @@ class ItemDetailViewController: UIViewController {
         dateLabel.text = "Posted \(relativeDate(from: item.createdAt))"
         descriptionLabel.text = item.description ?? "No description provided ."
         soldBadge.isHidden = !item.isSold
+        soldButton.setTitle(item.isSold ? "Mark as Available" : "Mark as Sold", for: .normal)
+        
     }
+    
+    
+    @objc private func soldButtonTapped() {
+        guard let currentItem = currentItem else { return }
+        let goingToSell = !currentItem.isSold
+        let message = goingToSell ? "Mark this item as sold?" : "Mark this item as available?"
+        let alert = UIAlertController(title: message, message: nil, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Confirm", style: .default) { [weak self] _ in
+            self?.updateSold(to: goingToSell)
+        })
+        present(alert, animated: true)
+    }
+    
+    private func updateSold(to isSold: Bool) {
+        APIClient.setSold(id: itemId, isSold: isSold) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                switch result {
+                case .success(let item):
+                    self.populate(with: item)     // re-draws badge + button label
+                case .failure(let error):
+                    self.setState(.error(error))
+                }
+            }
+        }
+    }
+    
     
     
     // SMKT003 - TURNING TIMESTAMP INTO SOMETHING LIKE "2 HOURS AGO... "
@@ -123,7 +156,7 @@ class ItemDetailViewController: UIViewController {
         titleLabel.numberOfLines = 0
         descriptionLabel.numberOfLines = 0
         
-        [soldBadge , titleLabel, priceLabel, categoryLabel, sellerLabel, dateLabel, descriptionLabel]
+        [soldBadge , titleLabel, priceLabel, categoryLabel, sellerLabel, dateLabel, descriptionLabel , soldButton]
                     .forEach { stack.addArrangedSubview($0) }
         
         
@@ -135,6 +168,8 @@ class ItemDetailViewController: UIViewController {
         soldBadge.layer.cornerRadius = 8
         soldBadge.clipsToBounds = true
         soldBadge.isHidden = true
+        soldButton.configuration = .borderedProminent()
+        soldButton.addTarget(self, action: #selector(soldButtonTapped), for: .touchUpInside)
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)

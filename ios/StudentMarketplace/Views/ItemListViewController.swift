@@ -44,6 +44,7 @@ class ItemListViewController: UITableViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        print("list reappeared, reloading")
         loadItems()
     }
 
