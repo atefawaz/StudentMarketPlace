@@ -21,4 +21,4 @@
 | C012 | Missing authentication | 306 | High | done | C012 report + delete PoC |
 | C013 | Overly permissive CORS | 942 | Medium | done | C013 report |
 | C014 | Version info exposure | 200 | Low | done | C014 report + header PoC |
-| C015 | Error handling review | 209 | TBD | in progress | C015 report |
+| C015 | Error handling review | 209 | Info | done | C015 report (no leak found) |
