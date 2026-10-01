@@ -20,6 +20,7 @@ class ItemDetailViewController: UIViewController {
     private let descriptionLabel = UILabel()
     private let soldBadge = UILabel()
     private let soldButton = UIButton(type: .system)
+    private var currentItem: Item?
     
     private let spinner = UIActivityIndicatorView(style: .large)
     private let errorLabel = UILabel()
@@ -58,6 +59,7 @@ class ItemDetailViewController: UIViewController {
         }
     
     private func populate(with item : Item ) {
+        currentItem = item
         titleLabel.text = item.title
         priceLabel.text = item.formattedPrice
         categoryLabel.text = "Category : \(item.category)"
@@ -69,9 +71,33 @@ class ItemDetailViewController: UIViewController {
         
     }
     
+    
     @objc private func soldButtonTapped() {
-        print("sold button tapped")   
+        guard let currentItem = currentItem else { return }
+        let goingToSell = !currentItem.isSold
+        let message = goingToSell ? "Mark this item as sold?" : "Mark this item as available?"
+        let alert = UIAlertController(title: message, message: nil, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Confirm", style: .default) { [weak self] _ in
+            self?.updateSold(to: goingToSell)
+        })
+        present(alert, animated: true)
     }
+    
+    private func updateSold(to isSold: Bool) {
+        APIClient.setSold(id: itemId, isSold: isSold) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                switch result {
+                case .success(let item):
+                    self.populate(with: item)     // re-draws badge + button label
+                case .failure(let error):
+                    self.setState(.error(error))
+                }
+            }
+        }
+    }
+    
     
     
     // SMKT003 - TURNING TIMESTAMP INTO SOMETHING LIKE "2 HOURS AGO... "

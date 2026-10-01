@@ -124,6 +124,44 @@ class APIClient {
         }.resume()
     }
     
+    
+    /// Mark an item as sold or available.
+    static func setSold(id: Int, isSold: Bool,
+                        completion: @escaping (Result<Item, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/items/\(id)") else { return }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "PATCH"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try? JSONEncoder().encode(["is_sold": isSold])
+
+        URLSession.shared.dataTask(with: urlRequest) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+
+            if let http = response as? HTTPURLResponse {
+                if http.statusCode == 404 {
+                    completion(.failure(APIError.notFound))
+                    return
+                }
+                if !(200...299).contains(http.statusCode) {
+                    completion(.failure(APIError.server(http.statusCode)))
+                    return
+                }
+            }
+
+            guard let data = data else { return }
+            do {
+                let item = try JSONDecoder().decode(Item.self, from: data)
+                completion(.success(item))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+    
     // MARK: - GET /categories
     
     static func getCategories(completion: @escaping (Result<[ItemCategory], Error>) -> Void) {
