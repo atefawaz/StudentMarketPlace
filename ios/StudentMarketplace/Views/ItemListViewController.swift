@@ -5,6 +5,24 @@ class ItemListViewController: UITableViewController {
 
     private var items: [Item] = []
     private var selectedCategory: String? // nil = "All"
+    private var selectedSort: ItemSortOption = .saved {
+        didSet {
+            ItemSortOption.saved = selectedSort
+            updateSortButton()
+        }
+    }
+    
+    private lazy var sortButton: UIBarButtonItem = {
+        let item = UIBarButtonItem(
+            image: UIImage(systemName: "arrow.up.arrow.down.circle"),
+            style: .plain,
+            target: self,
+            action: #selector(openSortSheet)
+        )
+        item.accessibilityLabel = "Sort"
+        item.accessibilityValue = selectedSort.title
+        return item
+    }()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -12,17 +30,21 @@ class ItemListViewController: UITableViewController {
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "ItemCell")
 
         // "+" button to create a new item
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
+        let addButton = UIBarButtonItem(
             barButtonSystemItem: .add,
             target: self,
             action: #selector(openCreateItem)
         )
+        
+        navigationItem.rightBarButtonItems = [addButton, sortButton]
+        updateSortButton()
         
         loadCategories()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        print("list reappeared, reloading")
         loadItems()
     }
 
@@ -30,10 +52,11 @@ class ItemListViewController: UITableViewController {
 
     private func loadItems() {
         let requestedCategory = selectedCategory
+        let requestSort = selectedSort
 
-        APIClient.getItems(category: requestedCategory) { [weak self] result in
+        APIClient.getItems(category: requestedCategory, order_by: requestSort.rawValue) { [weak self] result in
             DispatchQueue.main.async {
-                guard let self, requestedCategory == self.selectedCategory else { return }
+                guard let self, requestedCategory == self.selectedCategory, requestSort == self.selectedSort else { return }
 
                 switch result {
                 case .success(let items):
@@ -66,6 +89,18 @@ class ItemListViewController: UITableViewController {
                 self?.tableView.tableHeaderView = row
             }
         }
+    }
+    
+    // MARK: - Sorting
+    
+    private func updateSortButton() {
+        sortButton.image = UIImage(systemName: "arrow.up.arrow.down.circle")
+        sortButton.accessibilityValue = selectedSort.title
+    }
+    
+    private func scrollToTop() {
+        tableView.setContentOffset(CGPoint(x: 0, y: -tableView.adjustedContentInset.top),
+                                   animated: false)
     }
 
     // MARK: - UITableViewDataSource
@@ -121,5 +156,15 @@ class ItemListViewController: UITableViewController {
     @objc private func openCreateItem() {
         let createVC = CreateItemViewController()
         navigationController?.pushViewController(createVC, animated: true)
+    }
+    
+    @objc private func openSortSheet() {
+        let sheet = SortOptionsViewController.makeSheet(selectedOption: selectedSort) { [weak self] option in
+            guard let self else { return }
+            self.selectedSort = option
+            self.scrollToTop()
+            self.loadItems()
+        }
+        present(sheet, animated: true)
     }
 }

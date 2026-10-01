@@ -6,6 +6,17 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from database import get_db
 
+# ---------------------------------------------------------------------------
+# Helper Constants
+# ---------------------------------------------------------------------------
+
+SORT_OPTIONS: dict = {
+    "price_asc":  "price ASC, id ASC",
+    "price_desc": "price DESC, id DESC",
+    "date_asc":   "created_at ASC, id ASC",
+    "date_desc":  "created_at DESC, id DESC",
+}
+DEFAULT_SORT: str = "date_desc"
 
 # ---------------------------------------------------------------------------
 # Pydantic schemas
@@ -44,6 +55,11 @@ class CategoryOut(BaseModel):
     category_count: int
 
 
+class ItemSoldUpdate(BaseModel):
+    """Schema used when updating an item to mark it as sold (PATCH body)."""
+    is_sold: bool 
+
+
 # ---------------------------------------------------------------------------
 # Items DB helpers
 # ---------------------------------------------------------------------------
@@ -60,19 +76,24 @@ def _serialize_row(row) -> dict:
     return d
 
 
-def get_all_items(category: Optional[str] = None) -> List[dict]:
-    """Return every item, newest first."""
+def get_all_items(category: Optional[str] = None, sort: Optional[str] = None) -> List[dict]:
+    """Return every item, optionally filtered by category and sorted (default: newest first)."""
+
+    order_by = SORT_OPTIONS.get(sort, SORT_OPTIONS[DEFAULT_SORT])
+
+    query = "SELECT * FROM items"
+    params = ()
+
+    if category:
+        query += " WHERE category = %s"
+        params = (category,)
+
+    query += f" ORDER BY {order_by}"
+
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
     try:
-        if category:
-            cursor.execute(
-                "SELECT * FROM items WHERE category = %s ORDER BY created_at DESC",
-                (category,),
-            )
-        else:
-            cursor.execute("SELECT * FROM items ORDER BY created_at DESC")
-
+        cursor.execute(query, params)
         rows = cursor.fetchall()
     finally:
         cursor.close()

@@ -30,20 +30,27 @@ class APIClient {
 
     /// Fetch marketplace items, optionally filtered by category.
     static func getItems(category: String? = nil,
+                         order_by: String? = nil,
                          completion: @escaping (Result<[Item], Error>) -> Void) {
         guard var components = URLComponents(string: "\(baseURL)/items") else {
             completion(.failure(URLError(.badURL)))
             return
         }
 
-        if let category = category {
-            components.queryItems = [URLQueryItem(name: "category", value: category)]
-        }
+        var queryItems: [URLQueryItem] = []
+        
+        if let category { queryItems.append(URLQueryItem(name: "category", value: category)) }
+        if let order_by { queryItems.append(URLQueryItem(name: "sort", value: order_by)) }
+        
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
 
         guard let url = components.url else {
             completion(.failure(URLError(.badURL)))
             return
         }
+        
+        var request = URLRequest(url: url)
+                request.cachePolicy = .reloadIgnoringLocalCacheData
 
         URLSession.shared.dataTask(with: url) { data, _, error in
             if let error = error {
@@ -114,6 +121,44 @@ class APIClient {
                 completion(.failure(error))
                 return
             }
+            guard let data = data else { return }
+            do {
+                let item = try JSONDecoder().decode(Item.self, from: data)
+                completion(.success(item))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+    
+    
+    /// Mark an item as sold or available.
+    static func setSold(id: Int, isSold: Bool,
+                        completion: @escaping (Result<Item, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/items/\(id)") else { return }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "PATCH"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try? JSONEncoder().encode(["is_sold": isSold])
+
+        URLSession.shared.dataTask(with: urlRequest) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+
+            if let http = response as? HTTPURLResponse {
+                if http.statusCode == 404 {
+                    completion(.failure(APIError.notFound))
+                    return
+                }
+                if !(200...299).contains(http.statusCode) {
+                    completion(.failure(APIError.server(http.statusCode)))
+                    return
+                }
+            }
+
             guard let data = data else { return }
             do {
                 let item = try JSONDecoder().decode(Item.self, from: data)

@@ -18,11 +18,13 @@ from database import init_db, get_db
 from models import (
     ItemCreate, 
     ItemOut, 
-    CategoryOut, 
+    CategoryOut,
+    _serialize_row, 
     get_all_items, 
     get_item_by_id, 
     create_item, 
-    get_all_categories
+    get_all_categories,
+    ItemSoldUpdate
 )
 
 SECRET_KEY = "super-secret-key-123"
@@ -86,9 +88,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 @app.get("/items", response_model=list[ItemOut])
-def list_items(category: Optional[str] = None):
+def list_items(category: Optional[str] = None, sort: Optional[str] = None):
     """Return all marketplace items, newest first."""
-    return get_all_items(category)
+    return get_all_items(category, sort)
 
 
 @app.get("/items/{item_id}", response_model=ItemOut)
@@ -157,22 +159,22 @@ def delete_item(item_id: int):
 
 
 
-@app.patch("/items/{item_id}")
-def update_item(item_id: int, request_body: dict):
+@app.patch("/items/{item_id}" , response_model=ItemOut)
+def update_item_sold(item_id: int, payload: ItemSoldUpdate):
     conn = get_db()
-    cursor = conn.cursor()
-    fields = []
-    values = []
-    for key, value in request_body.items():
-        fields.append(f"{key} = %s")
-        values.append(value)
-    values.append(item_id)
-    cursor.execute(f"UPDATE items SET {', '.join(fields)} WHERE id = %s", values)
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("UPDATE items SET is_sold = %s WHERE id = %s", (payload.is_sold, item_id))
     conn.commit()
+    cursor.execute("SELECT * FROM items WHERE id = %s", (item_id,))
+    row = cursor.fetchone()
     cursor.close()
     conn.close()
-    return {"message": "Item updated"}
+    if row is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return _serialize_row(row)
 
+
+  
 
 
 @app.post("/sellers/register")
