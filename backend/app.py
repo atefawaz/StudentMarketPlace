@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from typing import Optional
+import html as html_lib
 
 from database import init_db, get_db
 from models import (
@@ -140,8 +141,11 @@ def admin_page():
     html = "<html><head><title>Admin - Items</title></head><body>"
     html += "<h1>Marketplace Admin Panel</h1>"
     for item in items:
-        html += f"<div class='item'><h3>{item['title']}</h3><p>{item['description']}</p><span>Seller: {item['seller_name']}</span></div>"
-    html += "</body></html>"
+        title = html_lib.escape(item['title'])
+        description = html_lib.escape(item['description'] or "")
+        seller = html_lib.escape(item['seller_name'])
+        html += f"<div class='item'><h3>{title}</h3><p>{description}</p><span>Seller: {seller}</span></div>"
+
     return HTMLResponse(content=html)
 
 
