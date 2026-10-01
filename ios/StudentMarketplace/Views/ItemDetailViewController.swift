@@ -19,6 +19,7 @@ class ItemDetailViewController: UIViewController {
     private let dateLabel = UILabel()
     private let descriptionLabel = UILabel()
     private let soldBadge = UILabel()
+    private let soldButton = UIButton(type: .system)
     
     private let spinner = UIActivityIndicatorView(style: .large)
     private let errorLabel = UILabel()
@@ -64,6 +65,12 @@ class ItemDetailViewController: UIViewController {
         dateLabel.text = "Posted \(relativeDate(from: item.createdAt))"
         descriptionLabel.text = item.description ?? "No description provided ."
         soldBadge.isHidden = !item.isSold
+        soldButton.setTitle(item.isSold ? "Mark as Available" : "Mark as Sold", for: .normal)
+        
+    }
+    
+    @objc private func soldButtonTapped() {
+        print("sold button tapped")   
     }
     
     
@@ -123,7 +130,7 @@ class ItemDetailViewController: UIViewController {
         titleLabel.numberOfLines = 0
         descriptionLabel.numberOfLines = 0
         
-        [soldBadge , titleLabel, priceLabel, categoryLabel, sellerLabel, dateLabel, descriptionLabel]
+        [soldBadge , titleLabel, priceLabel, categoryLabel, sellerLabel, dateLabel, descriptionLabel , soldButton]
                     .forEach { stack.addArrangedSubview($0) }
         
         
@@ -135,6 +142,8 @@ class ItemDetailViewController: UIViewController {
         soldBadge.layer.cornerRadius = 8
         soldBadge.clipsToBounds = true
         soldBadge.isHidden = true
+        soldButton.configuration = .borderedProminent()
+        soldButton.addTarget(self, action: #selector(soldButtonTapped), for: .touchUpInside)
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
