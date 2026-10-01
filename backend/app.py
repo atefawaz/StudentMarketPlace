@@ -120,7 +120,7 @@ def list_categories():
 def search_items(q: str = ""):
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute(f"SELECT * FROM items WHERE title LIKE '%{q}%' OR description LIKE '%{q}%' ORDER BY created_at DESC")
+    cursor.execute(f"SELECT * FROM items WHERE title LIKE %s OR description LIKE %s ORDER BY created_at DESC", (f"%{q}%", f"%{q}%"))
     results = cursor.fetchall()
     cursor.close()
     conn.close()
