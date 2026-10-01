@@ -5,7 +5,13 @@ Usage:
     python seed.py
 """
 
+from dotenv import load_dotenv
+
 from database import init_db, get_db
+from security import hash_password
+from utilities import get_required_env
+
+load_dotenv()
 
 ITEMS = [
     # ---- Books (5) ----
@@ -194,6 +200,23 @@ ITEMS = [
     },
 ]
 
+SELLERS = [
+    {
+        "username": "admin",
+        "email": "admin@marketplace.epita.fr",
+        "password_env": "SEED_ADMIN_PASSWORD",
+    },
+    {
+        "username": "alice_martin",
+        "email": "alice.martin@epita.fr",
+        "password_env": "SEED_ALICE_PASSWORD",
+    },
+    {
+        "username": "lucas_dupont",
+        "email": "lucas.dupont@epita.fr",
+        "password_env": "SEED_LUCAS_PASSWORD",
+    },
+]
 
 def seed():
     init_db()
@@ -233,32 +256,37 @@ def seed():
 
 
 def seed_users():
+    prepared = [
+        (
+            s["username"],
+            hash_password(get_required_env(s["password_env"])),
+            s["email"],
+        )
+        for s in SELLERS
+    ]
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sellers (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(255) NOT NULL,
-            password VARCHAR(255) NOT NULL,
-            email VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    try:
+        cursor.execute("DROP TABLE IF EXISTS sellers")
+        cursor.execute("""
+            CREATE TABLE sellers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(255) NOT NULL UNIQUE,
+                password_hash VARCHAR(255) NOT NULL,
+                email VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.executemany(
+            "INSERT INTO sellers (username, password_hash, email) VALUES (%s, %s, %s)",
+            prepared,
         )
-    """)
-    cursor.execute("DELETE FROM sellers")
-    sellers = [
-        ("admin", "admin123", "admin@marketplace.epita.fr"),
-        ("alice_martin", "password", "alice.martin@epita.fr"),
-        ("lucas_dupont", "lucas2026", "lucas.dupont@epita.fr"),
-    ]
-    for username, password, email in sellers:
-        cursor.execute(
-            "INSERT INTO sellers (username, password, email) VALUES (%s, %s, %s)",
-            (username, password, email),
-        )
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print(f"Seeded {len(sellers)} sellers.")
+        conn.commit()
+        print(f"Seeded {len(prepared)} sellers.")
+    finally:
+        cursor.close()
+        conn.close()
 
 
 if __name__ == "__main__":
