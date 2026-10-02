@@ -31,7 +31,7 @@
 | C018 | XSS exploit (3 payloads) | done | c018_xss_payloads.py + screenshot |
 | C019 | IDOR enumeration script | done | c019_idor_enum.py + screenshot (25/25) |
 | C020 | Rate limit / DoS test | done | c020_rate_limit.py + screenshot |
-| C021 | Automated scan (nmap + Python) | todo | — |
+| C021 | Automated scan (nmap + Python) | done | c021_scan.py + screenshot |
 | C022 | API fuzzer | todo | — |
 | C023 | Project-specific exploit | todo | — |
 | C024 | test_security.py (8+ cases) | todo | — |
