@@ -182,15 +182,41 @@ def delete_item(item_id: int):
 def update_item_sold(item_id: int, payload: ItemSoldUpdate):
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("UPDATE items SET is_sold = %s WHERE id = %s", (payload.is_sold, item_id))
-    conn.commit()
-    cursor.execute("SELECT * FROM items WHERE id = %s", (item_id,))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return _serialize_row(row)
+
+    try:
+        # atomic: only touches the row if the state actually changes
+        cursor.execute(
+            "UPDATE items SET is_sold = %s WHERE id = %s AND NOT (is_sold <=> %s)",
+            (payload.is_sold, item_id, payload.is_sold),
+        )
+
+        # if no rows were updated
+        if cursor.rowcount == 0:
+            conn.rollback()
+
+            cursor.execute("SELECT id FROM items WHERE id = %s", (item_id,))
+            if cursor.fetchone() is None:
+                raise HTTPException(status_code=404, detail="Item not found")
+            
+            state = "sold" if payload.is_sold else "available"
+
+            raise HTTPException(status_code=409, detail=f"Item is already {state}")
+
+        cursor.execute("SELECT * FROM items WHERE id = %s", (item_id,))
+        row = cursor.fetchone()
+        conn.commit()
+        return _serialize_row(row)
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # ---------- Auth Endpoints ----------
 
