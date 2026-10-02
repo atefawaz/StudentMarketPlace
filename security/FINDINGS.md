@@ -14,7 +14,7 @@
 | ID | Finding | CWE | Severity | Status | Evidence |
 |----|---------|-----|----------|--------|----------|
 | C007 | SQLi in /items/search | 89 | Critical | done | C007 report + c007_sqli_poc.py |
-| C008 | Stored XSS in /admin | 79 | High | done | C008 report + popup screenshot |
+| C008 | Stored XSS in /admin | 79 | High | done | C008 report + screenshots |
 | C009 | IDOR on DELETE/PATCH | 639 | High | done | C009 report + c009_idor_poc.txt |
 | C010 | Hardcoded secret key | 798 | Medium | done | C010 report |
 | C011 | Plaintext passwords | 328 | High | done | C011 report |
@@ -27,8 +27,8 @@
 ## Security testing (Phase 3 — exploits)
 | ID | Task | Status | Evidence |
 |----|------|--------|----------|
-| C017 | SQLi exploit script | done | c007_sqli_poc.py |
-| C018 | XSS exploit (3 payloads) | todo | — |
+| C017 | SQLi exploit script | done | c007_sqli_poc.py + C017 report |
+| C018 | XSS exploit (3 payloads) | done | c018_xss_payloads.py + screenshot |
 | C019 | IDOR enumeration script | todo | — |
 | C020 | Rate limit / DoS test | todo | — |
 | C021 | Automated scan (nmap + Python) | todo | — |
