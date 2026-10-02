@@ -45,7 +45,7 @@ def search(client, term, **params):
 
 def titles(response):
     assert response.status_code == 200, response.text
-    return [item["title"] for item in response.json()]
+    return [item["title"] for item in response.json()["items"]]
 
 
 # ---------------------------------------------------------------------------
@@ -99,14 +99,15 @@ def test_search_includes_sold_items(client):
     response = search(client, "chair")
 
     assert titles(response) == ["Sold Chair"]
-    assert response.json()[0]["is_sold"] is True
+    assert response.json()["items"][0]["is_sold"] is True
 
 
 def test_search_with_no_match_returns_empty_list(client, catalog):
     response = search(client, "zzz-no-such-item")
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json()["items"] == []
+    assert response.json()["total"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +116,7 @@ def test_search_with_no_match_returns_empty_list(client, catalog):
 
 
 def test_no_search_param_returns_everything(client, catalog):
-    assert len(client.get("/items").json()) == len(SEARCH_ITEMS) + 3  # + conftest seed
+    assert client.get("/items").json()["total"] == len(SEARCH_ITEMS) + 3  # + conftest seed
 
 
 @pytest.mark.parametrize("term", ["", " ", "     "], ids=["empty", "space", "spaces"])
@@ -134,7 +135,7 @@ def test_blank_search_returns_everything(client, catalog, term):
 
 
 def test_search_results_are_full_items(client, catalog):
-    results = search(client, "Calculus").json()
+    results = search(client, "Calculus").json()["items"]
 
     assert results == [catalog["Calculus Textbook"]]
 
@@ -196,13 +197,14 @@ def test_sql_injection_payloads_match_nothing(client, catalog, payload):
     response = search(client, payload)
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json()["items"] == []
+    assert response.json()["total"] == 0
 
 
 def test_sql_injection_does_not_damage_the_data(client, catalog):
     search(client, "'; DROP TABLE items; -- ")
 
-    assert len(client.get("/items").json()) == len(SEARCH_ITEMS) + 3
+    assert client.get("/items").json()["total"] == len(SEARCH_ITEMS) + 3
 
 
 def test_sql_injection_cannot_leak_other_tables(client, catalog):
@@ -221,7 +223,8 @@ def test_search_at_max_length_is_accepted(client, catalog):
     response = search(client, "a" * 100)
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json()["items"] == []
+    assert response.json()["total"] == 0
 
 
 def test_search_over_max_length_is_a_validation_error(client, catalog):
@@ -253,15 +256,15 @@ def test_search_and_category_are_anded_not_ored(client, catalog):
 
 
 def test_search_sorted_by_price(client, catalog):
-    ascending = search(client, "poster", sort="price_asc").json()
-    descending = search(client, "poster", sort="price_desc").json()
+    ascending = search(client, "poster", sort="price_asc").json()["items"]
+    descending = search(client, "poster", sort="price_desc").json()["items"]
 
     assert [i["price"] for i in ascending] == [5.0, 6.0]
     assert [i["price"] for i in descending] == [6.0, 5.0]
 
 
 def test_search_default_order_is_newest_first(client, catalog):
-    results = search(client, "poster").json()
+    results = search(client, "poster").json()["items"]
 
     # both created in the same fixture run: later id = newer
     assert [i["id"] for i in results] == sorted((i["id"] for i in results), reverse=True)

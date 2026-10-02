@@ -21,6 +21,8 @@ load_dotenv()
 
 from database import init_db, get_db
 from models import (
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
     ItemCreate, 
     ItemOut, 
     CategoryOut,
@@ -30,8 +32,9 @@ from models import (
     SellerOut,
     TokenOut,
     UsernameTakenError,
+    PaginatedItemsOut,
     _serialize_row, 
-    get_all_items, 
+    get_items_page, 
     get_item_by_id, 
     create_item, 
     get_all_categories,
@@ -106,7 +109,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # ---------- Item Endpoints ----------
 
 
-@app.get("/items", response_model=list[ItemOut])
+@app.get("/items", response_model=PaginatedItemsOut)
 def list_items(
     category: Optional[str] = None,
     sort: Optional[str] = None,
@@ -115,12 +118,21 @@ def list_items(
         max_length=100,
         description="Case-insensitive search on item title and description",
     ),
+    page: int = Query(1, ge=1, description="Page number, starting at 1"),
+    page_size: int = Query(
+        DEFAULT_PAGE_SIZE,
+        ge=1,
+        le=MAX_PAGE_SIZE,
+        description=f"Items per page (max {MAX_PAGE_SIZE})",
+    ),
 ):
     """Return all marketplace items, newest first."""
-    return get_all_items(
+    return get_items_page(
         category=category,
         sort=sort,
         search=search,
+        page=page,
+        page_size=page_size,
     )
 
 
