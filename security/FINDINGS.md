@@ -27,7 +27,7 @@
 ## Security testing (Phase 3 — exploits)
 | ID | Task | Status | Evidence |
 |----|------|--------|----------|
-| C017 | SQLi exploit script | todo | c007_sqli_poc.py |
+| C017 | SQLi exploit script | done | c007_sqli_poc.py |
 | C018 | XSS exploit (3 payloads) | todo | — |
 | C019 | IDOR enumeration script | todo | — |
 | C020 | Rate limit / DoS test | todo | — |
