@@ -29,7 +29,7 @@
 |----|------|--------|----------|
 | C017 | SQLi exploit script | done | c007_sqli_poc.py + C017 report |
 | C018 | XSS exploit (3 payloads) | done | c018_xss_payloads.py + screenshot |
-| C019 | IDOR enumeration script | todo | — |
+| C019 | IDOR enumeration script | done | c019_idor_enum.py + screenshot (25/25) |
 | C020 | Rate limit / DoS test | todo | — |
 | C021 | Automated scan (nmap + Python) | todo | — |
 | C022 | API fuzzer | todo | — |
