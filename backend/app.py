@@ -10,9 +10,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from typing import Optional
+import html as html_lib
 
 from database import init_db, get_db
 from models import (
@@ -36,20 +36,13 @@ app = FastAPI(
 )
 
 
-class PoweredByMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        response = await call_next(request)
-        response.headers["X-Powered-By"] = "FastAPI/0.104.1 Python/3.11"
-        return response
 
-
-app.add_middleware(PoweredByMiddleware)
 
 # Allow all origins so the Android / iOS emulators can reach the server.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -120,7 +113,7 @@ def list_categories():
 def search_items(q: str = ""):
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute(f"SELECT * FROM items WHERE title LIKE '%{q}%' OR description LIKE '%{q}%' ORDER BY created_at DESC")
+    cursor.execute(f"SELECT * FROM items WHERE title LIKE %s OR description LIKE %s ORDER BY created_at DESC", (f"%{q}%", f"%{q}%"))
     results = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -140,8 +133,11 @@ def admin_page():
     html = "<html><head><title>Admin - Items</title></head><body>"
     html += "<h1>Marketplace Admin Panel</h1>"
     for item in items:
-        html += f"<div class='item'><h3>{item['title']}</h3><p>{item['description']}</p><span>Seller: {item['seller_name']}</span></div>"
-    html += "</body></html>"
+        title = html_lib.escape(item['title'])
+        description = html_lib.escape(item['description'] or "")
+        seller = html_lib.escape(item['seller_name'])
+        html += f"<div class='item'><h3>{title}</h3><p>{description}</p><span>Seller: {seller}</span></div>"
+
     return HTMLResponse(content=html)
 
 
