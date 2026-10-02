@@ -22,3 +22,26 @@
 | C013 | Overly permissive CORS | 942 | Medium | done | C013 report |
 | C014 | Version info exposure | 200 | Low | done | C014 report + header PoC |
 | C015 | Error handling review | 209 | Info | done | C015 report (no leak found) |
+| C016 | Audit of SE teammates' fixes | — | Review | done | C016 report (3 bug reports) |
+
+## Security testing (Phase 3 — exploits)
+| ID | Task | Status | Evidence |
+|----|------|--------|----------|
+| C017 | SQLi exploit script | todo | c007_sqli_poc.py |
+| C018 | XSS exploit (3 payloads) | todo | — |
+| C019 | IDOR enumeration script | todo | — |
+| C020 | Rate limit / DoS test | todo | — |
+| C021 | Automated scan (nmap + Python) | todo | — |
+| C022 | API fuzzer | todo | — |
+| C023 | Project-specific exploit | todo | — |
+| C024 | test_security.py (8+ cases) | todo | — |
+
+## Deployment & hardening (Phase 4)
+| ID | Task | Status | Evidence |
+|----|------|--------|----------|
+| C025 | Fix SQL injection | todo | — |
+| C026 | Add authentication + fix IDOR | todo | — |
+| C027 | Secure configuration | todo | — |
+| C028 | Security headers + rate limiting | todo | — |
+| C029 | Structured logging + alerting | todo | — |
+| C030 | Final audit report | todo | — |
