@@ -139,19 +139,34 @@ def _serialize_row(row) -> dict:
             d[key] = value.isoformat()
     return d
 
+def _escape_like(value: str) -> str:
+    """Escape LIKE wildcards so user input is matched literally."""
+    return (
+        value.replace("\\", "\\\\")
+             .replace("%", "\\%")
+             .replace("_", "\\_")
+    )
 
-def get_all_items(category: Optional[str] = None, sort: Optional[str] = None) -> List[dict]:
+def get_all_items(category: Optional[str] = None, sort: Optional[str] = None, search: Optional[str] = None) -> List[dict]:
     """Return every item, optionally filtered by category and sorted (default: newest first)."""
 
     order_by = SORT_OPTIONS.get(sort, SORT_OPTIONS[DEFAULT_SORT])
 
-    query = "SELECT * FROM items"
-    params = ()
+    conditions: List[str] = []
+    params: List[str] = []
 
     if category:
-        query += " WHERE category = %s"
-        params = (category,)
+        conditions.append("category = %s")
+        params.append(category)
 
+    if search and search.strip():
+        pattern = f"%{_escape_like(search.strip())}%"
+        conditions.append("(title LIKE %s OR description LIKE %s)")
+        params.extend([pattern, pattern])
+
+    query = "SELECT * FROM items"
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
     query += f" ORDER BY {order_by}"
 
     conn = get_db()

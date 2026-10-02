@@ -6,7 +6,7 @@ Run with:
 """
 
 import logging
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -107,9 +107,21 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 @app.get("/items", response_model=list[ItemOut])
-def list_items(category: Optional[str] = None, sort: Optional[str] = None):
+def list_items(
+    category: Optional[str] = None,
+    sort: Optional[str] = None,
+    search: Optional[str] = Query(
+        None,
+        max_length=100,
+        description="Case-insensitive search on item title and description",
+    ),
+):
     """Return all marketplace items, newest first."""
-    return get_all_items(category, sort)
+    return get_all_items(
+        category=category,
+        sort=sort,
+        search=search,
+    )
 
 
 @app.get("/items/{item_id}", response_model=ItemOut)
