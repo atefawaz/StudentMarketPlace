@@ -33,7 +33,7 @@
 | C020 | Rate limit / DoS test | done | c020_rate_limit.py + screenshot |
 | C021 | Automated scan (nmap + Python) | done | c021_scan.py + screenshot |
 | C022 | API fuzzer | done | c022_fuzzer.py + poc (unbounded price) |
-| C023 | Project-specific exploit | todo | — |
+| C023 | Project-specific exploit | done | c023_mass_delete.py + screenshot |
 | C024 | test_security.py (8+ cases) | todo | — |
 
 ## Deployment & hardening (Phase 4)
