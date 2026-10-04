@@ -37,6 +37,12 @@ class ItemListViewController: UITableViewController {
         )
         
         navigationItem.rightBarButtonItems = [addButton, sortButton]
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            title: "Login",
+            style: .plain,
+            target: self,
+            action: #selector(openAuth)
+        )
         updateSortButton()
         
         loadCategories()
@@ -156,6 +162,13 @@ class ItemListViewController: UITableViewController {
     @objc private func openCreateItem() {
         let createVC = CreateItemViewController()
         navigationController?.pushViewController(createVC, animated: true)
+    }
+    
+    @objc private func openAuth() {
+        guard presentedViewController == nil else { return }
+        let authVC = AuthViewController()
+        let nav = UINavigationController(rootViewController: authVC)
+        present(nav, animated: true)
     }
     
     @objc private func openSortSheet() {
