@@ -8,7 +8,7 @@ Usage:
 from dotenv import load_dotenv
 
 from database import init_db, get_db
-from security import hash_password
+from auth import hash_password
 from utilities import get_required_env
 
 load_dotenv()

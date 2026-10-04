@@ -8,13 +8,21 @@ import Foundation
 ///
 
 
+extension Notification.Name {
+    static let sessionExpired = Notification.Name("sessionExpired")
+}
+
 enum APIError : LocalizedError{
     case notFound
+    case forbidden
+    case unauthorized
     case server(Int)
     
     var errorDescription: String? {
         switch self {
         case .notFound :    return "This item no longer exists "
+        case .forbidden : return "You don't have permission to do this."
+        case .unauthorized : return "Your session has expired. Please log in again."
         case .server(let s) : return "Service error (\(s))."
             
         }
@@ -25,6 +33,40 @@ class APIClient {
     /// Base URL of the FastAPI server.
     /// Change to your machine's IP if running on a physical device.
     static let baseURL = "http://127.0.0.1:5000"
+    
+    
+    
+    /// Inspects an HTTP response and returns the body data, or the right APIError.
+    private static func handle(data: Data?, response: URLResponse?, error: Error?) -> Result<Data, Error> {
+        if let error = error { return .failure(error) }
+
+        guard let http = response as? HTTPURLResponse else {
+            return .failure(URLError(.badServerResponse))
+        }
+
+        switch http.statusCode {
+        case 200...299:
+            guard let data = data else { return .failure(URLError(.badServerResponse)) }
+            return .success(data)
+        case 401:
+            KeychainStore.delete()
+            NotificationCenter.default.post(name: .sessionExpired, object: nil)
+            return .failure(APIError.unauthorized)
+        case 403:
+            return .failure(APIError.forbidden)
+        case 404:
+            return .failure(APIError.notFound)
+        default:
+            return .failure(APIError.server(http.statusCode))
+        }
+    }
+
+    /// Adds the Authorization: Bearer header if a token is stored.
+    private static func authorize(_ request: inout URLRequest) {
+        if let token = KeychainStore.read() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+    }
 
     // MARK: - GET /items
 
@@ -114,6 +156,7 @@ class APIClient {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        authorize(&urlRequest)
         urlRequest.httpBody = try? JSONEncoder().encode(request)
 
         URLSession.shared.dataTask(with: urlRequest) { data, _, error in
@@ -185,6 +228,74 @@ class APIClient {
                 completion(.success(categories))
             } catch {
                 completion(.failure(error))
+            }
+        }.resume()
+    }
+    
+    
+    
+    
+    
+    // MARK: - POST /auth/login
+    static func login(username: String, password: String,
+                      completion: @escaping (Result<String, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/auth/login") else {
+            completion(.failure(URLError(.badURL))); return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONEncoder().encode(["username": username, "password": password])
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            switch handle(data: data, response: response, error: error) {
+            case .success(let data):
+                do { completion(.success(try JSONDecoder().decode(TokenResponse.self, from: data).accessToken)) }
+                catch { completion(.failure(error)) }
+            case .failure(let error): completion(.failure(error))
+            }
+        }.resume()
+    }
+
+    // MARK: - POST /auth/register
+    static func register(username: String, password: String,
+                         displayName: String, email: String,
+                         completion: @escaping (Result<Seller, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/auth/register") else {
+            completion(.failure(URLError(.badURL))); return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONEncoder().encode([
+            "username": username, "password": password,
+            "display_name": displayName, "email": email
+        ])
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            switch handle(data: data, response: response, error: error) {
+            case .success(let data):
+                do { completion(.success(try JSONDecoder().decode(Seller.self, from: data))) }
+                catch { completion(.failure(error)) }
+            case .failure(let error): completion(.failure(error))
+            }
+        }.resume()
+    }
+
+    // MARK: - GET /auth/me  (needs auth)
+    static func me(completion: @escaping (Result<Seller, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/auth/me") else {
+            completion(.failure(URLError(.badURL))); return
+        }
+        var request = URLRequest(url: url)
+        authorize(&request)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            switch handle(data: data, response: response, error: error) {
+            case .success(let data):
+                do { completion(.success(try JSONDecoder().decode(Seller.self, from: data))) }
+                catch { completion(.failure(error)) }
+            case .failure(let error): completion(.failure(error))
             }
         }.resume()
     }
