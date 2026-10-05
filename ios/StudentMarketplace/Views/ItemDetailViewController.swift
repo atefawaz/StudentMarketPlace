@@ -67,6 +67,8 @@ class ItemDetailViewController: UIViewController {
         dateLabel.text = "Posted \(relativeDate(from: item.createdAt))"
         descriptionLabel.text = item.description ?? "No description provided ."
         soldBadge.isHidden = !item.isSold
+        let isOwner = (Session.shared.currentSeller?.id == item.sellerId)
+        soldButton.isHidden = !isOwner
         soldButton.setTitle(item.isSold ? "Mark as Available" : "Mark as Sold", for: .normal)
         
     }
@@ -92,7 +94,17 @@ class ItemDetailViewController: UIViewController {
                 case .success(let item):
                     self.populate(with: item)     // re-draws badge + button label
                 case .failure(let error):
-                    self.setState(.error(error))
+                    if case APIError.forbidden = error {
+                        let alert = UIAlertController(
+                            title: "Not allowed",
+                            message: "You can only change items you posted.",
+                            preferredStyle: .alert
+                        )
+                        alert.addAction(UIAlertAction(title: "OK", style: .default))
+                        self.present(alert, animated: true)
+                    } else {
+                        self.setState(.error(error))
+                    }
                 }
             }
         }
