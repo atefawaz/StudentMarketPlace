@@ -37,14 +37,18 @@ class ItemListViewController: UITableViewController {
         )
         
         navigationItem.rightBarButtonItems = [addButton, sortButton]
-        navigationItem.leftBarButtonItem = UIBarButtonItem(
-            title: "Login",
-            style: .plain,
-            target: self,
-            action: #selector(openAuth)
-        )
-        updateSortButton()
         
+        updateSortButton()
+        refreshAuthUI()
+        
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(sessionChanged),
+            name: .sessionChanged, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(sessionDidExpire),
+            name: .sessionExpired, object: nil
+        )
         loadCategories()
     }
 
@@ -52,6 +56,34 @@ class ItemListViewController: UITableViewController {
         super.viewWillAppear(animated)
         print("list reappeared, reloading")
         loadItems()
+        refreshAuthUI()
+    }
+    
+    
+    private func refreshAuthUI() {
+        // Ensure UI work always happens on the main thread, whoever called us.
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.refreshAuthUI() }
+            return
+        }
+
+        if let seller = Session.shared.currentSeller {
+            navigationItem.leftBarButtonItem = UIBarButtonItem(
+                title: "Log out",
+                style: .plain,
+                target: self,
+                action: #selector(logoutTapped)
+            )
+            title = seller.username
+        } else {
+            navigationItem.leftBarButtonItem = UIBarButtonItem(
+                title: "Log in",
+                style: .plain,
+                target: self,
+                action: #selector(openAuth)
+            )
+            title = "Marketplace"
+        }
     }
 
     // MARK: - Data loading
@@ -160,6 +192,13 @@ class ItemListViewController: UITableViewController {
     // MARK: - Actions
 
     @objc private func openCreateItem() {
+        
+        // Gate: creating an item requires being logged in.
+            guard Session.shared.currentSeller != nil else {
+                openAuth()   // not logged in → show the auth screen instead
+                return
+            }
+        
         let createVC = CreateItemViewController()
         navigationController?.pushViewController(createVC, animated: true)
     }
@@ -169,6 +208,27 @@ class ItemListViewController: UITableViewController {
         let authVC = AuthViewController()
         let nav = UINavigationController(rootViewController: authVC)
         present(nav, animated: true)
+    }
+    
+    @objc private func logoutTapped() {
+        Session.shared.logout()
+        refreshAuthUI()
+        loadItems()
+    }
+    
+    @objc private func sessionChanged() {
+        refreshAuthUI()
+    }
+
+    @objc private func sessionDidExpire() {
+        refreshAuthUI()
+        let alert = UIAlertController(
+            title: "Session expired",
+            message: "Please log in again.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
     
     @objc private func openSortSheet() {

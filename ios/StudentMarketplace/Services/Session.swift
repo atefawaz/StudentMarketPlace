@@ -37,6 +37,9 @@ final class Session {
             switch result {
             case .success(let seller):
                 self?.currentSeller = seller
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .sessionChanged, object: nil)
+                }
                 completion(.success(seller))
             case .failure(let error):
                 completion(.failure(error))
@@ -81,5 +84,6 @@ final class Session {
     func logout() {
         KeychainStore.delete()      
         currentSeller = nil
+        NotificationCenter.default.post(name: .sessionChanged, object: nil)
     }
 }
