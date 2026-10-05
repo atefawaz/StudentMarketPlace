@@ -74,28 +74,30 @@ class APIClient {
     /// Fetch marketplace items, optionally filtered by category.
     static func getItems(category: String? = nil,
                          order_by: String? = nil,
-                         completion: @escaping (Result<[Item], Error>) -> Void) {
+                         page: Int = 1,
+                         pageSize: Int = 20,
+                         completion: @escaping (Result<ItemsPage, Error>) -> Void) {
         guard var components = URLComponents(string: "\(baseURL)/items") else {
             completion(.failure(URLError(.badURL)))
             return
         }
 
         var queryItems: [URLQueryItem] = []
-        
         if let category { queryItems.append(URLQueryItem(name: "category", value: category)) }
         if let order_by { queryItems.append(URLQueryItem(name: "sort", value: order_by)) }
-        
-        components.queryItems = queryItems.isEmpty ? nil : queryItems
+        queryItems.append(URLQueryItem(name: "page", value: String(page)))
+        queryItems.append(URLQueryItem(name: "page_size", value: String(pageSize)))
+        components.queryItems = queryItems
 
         guard let url = components.url else {
             completion(.failure(URLError(.badURL)))
             return
         }
-        
-        var request = URLRequest(url: url)
-                request.cachePolicy = .reloadIgnoringLocalCacheData
 
-        URLSession.shared.dataTask(with: url) { data, _, error in
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        URLSession.shared.dataTask(with: request) { data, _, error in
             if let error = error {
                 completion(.failure(error))
                 return
@@ -105,8 +107,8 @@ class APIClient {
                 return
             }
             do {
-                let items = try JSONDecoder().decode([Item].self, from: data)
-                completion(.success(items))
+                let page = try JSONDecoder().decode(ItemsPage.self, from: data)
+                completion(.success(page))
             } catch {
                 completion(.failure(error))
             }
