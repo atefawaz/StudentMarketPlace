@@ -39,9 +39,9 @@
 ## Deployment & hardening (Phase 4)
 | ID | Task | Status | Evidence |
 |----|------|--------|----------|
-| C025 | Fix SQL injection | todo | — |
-| C026 | Add authentication + fix IDOR | todo | — |
-| C027 | Secure configuration | todo | — |
+| C025 | Fix SQL injection | in progress | awaiting SE f-string fix, then verify |
+| C026 | Add authentication + fix IDOR | done | C026 report — auth + ownership verified |
+| C027 | Secure configuration | done | C027 report — bcrypt + env secret verified |
 | C028 | Security headers + rate limiting | todo | — |
 | C029 | Structured logging + alerting | todo | — |
 | C030 | Final audit report | todo | — |
