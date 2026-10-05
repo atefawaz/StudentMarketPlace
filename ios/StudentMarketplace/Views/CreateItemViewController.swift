@@ -12,7 +12,7 @@ class CreateItemViewController: UIViewController {
     private let descriptionField = FormTextField(placeholder: "Describe your item")
     private let priceField = FormTextField(placeholder: "0.00")
     private let categoryField = FormDropdownField(placeholder: "Select a category", options: ItemCategoryOptions.allCases.map(\.rawValue))
-    private let sellerField = FormTextField(placeholder: "Your name")
+    private let postingAsLabel = UILabel()
     private let submitButton = UIButton(type: .system)
     
     /// Each group = label + field + error message.
@@ -21,12 +21,10 @@ class CreateItemViewController: UIViewController {
     private lazy var descriptionGroup = FormFieldGroup(label: "Description", field: descriptionField)
     private lazy var priceGroup = FormFieldGroup(label: "Price", field: priceField)
     private lazy var categoryGroup = FormFieldGroup(label: "Category", field: categoryField)
-    private lazy var sellerGroup = FormFieldGroup(label: "Seller Name", field: sellerField)
-    
+        
     /// In the order they appear on screen.
     private var allGroups: [FormFieldGroup] {
-        [titleGroup, descriptionGroup, priceGroup, categoryGroup, sellerGroup]
-    }
+        [titleGroup, descriptionGroup, priceGroup, categoryGroup]       }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -47,10 +45,14 @@ class CreateItemViewController: UIViewController {
         descriptionField.autocapitalizationType = .sentences
         
         priceField.keyboardType = .decimalPad   /// digits and a decimal separator only
+        // Show who the item will be posted as (from the session).
+       let name = Session.shared.currentSeller?.displayName
+           ?? Session.shared.currentSeller?.username
+           ?? "you"
+       postingAsLabel.text = "Posting as \(name)"
+       postingAsLabel.font = .preferredFont(forTextStyle: .subheadline)
+       postingAsLabel.textColor = .secondaryLabel
         
-        sellerField.autocapitalizationType = .words
-        sellerField.autocorrectionType = .no
-        sellerField.textContentType = .name     /// lets iOS suggest the user's name
     }
     
     private func configureSubmitButton() {
@@ -69,9 +71,9 @@ class CreateItemViewController: UIViewController {
         formStack.spacing = 20
         formStack.translatesAutoresizingMaskIntoConstraints = false
         allGroups.forEach { formStack.addArrangedSubview($0) }
+        formStack.addArrangedSubview(postingAsLabel)
         formStack.addArrangedSubview(submitButton)
-        formStack.setCustomSpacing(32, after: sellerGroup) /// add space before the button
-
+        formStack.setCustomSpacing(32, after: postingAsLabel)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.alwaysBounceVertical = true
         scrollView.keyboardDismissMode = .interactive
@@ -139,7 +141,6 @@ class CreateItemViewController: UIViewController {
         let title = titleField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let description = descriptionField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let category = categoryField.selectedOption ?? ""
-        let seller = sellerField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let price = Decimal(
             string: priceField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             locale: .current
@@ -149,7 +150,6 @@ class CreateItemViewController: UIViewController {
         titleGroup.errorMessage = title.isEmpty ? "Enter a title." : nil
         priceGroup.errorMessage = price > 0 ? nil : "Enter a price greater than 0."
         categoryGroup.errorMessage = category.isEmpty ? "Choose a category." : nil
-        sellerGroup.errorMessage = seller.isEmpty ? "Enter your name." : nil
 
         // If something is wrong, point the user to the first problem and stop.
         if let firstInvalid = allGroups.first(where: { $0.errorMessage != nil }) {
@@ -169,7 +169,6 @@ class CreateItemViewController: UIViewController {
             price: NSDecimalNumber(decimal: price).doubleValue,
             category: category,
             imageUrl: nil,
-            sellerName: seller
         )
         
         setLoading(true)

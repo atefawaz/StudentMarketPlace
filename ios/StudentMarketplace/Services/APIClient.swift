@@ -184,6 +184,7 @@ class APIClient {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "PATCH"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        authorize(&urlRequest)
         urlRequest.httpBody = try? JSONEncoder().encode(["is_sold": isSold])
 
         URLSession.shared.dataTask(with: urlRequest) { data, response, error in
