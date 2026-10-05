@@ -11,8 +11,10 @@ from pydantic import (
     StringConstraints,
     field_validator
 )
-from typing import Optional, List, Annotated
+from typing import Optional, List, Annotated, cast
 from database import get_db
+
+import math
 
 from mysql.connector import IntegrityError, errorcode
 
@@ -27,6 +29,10 @@ SORT_OPTIONS: dict = {
     "date_desc":  "created_at DESC, id DESC",
 }
 DEFAULT_SORT: str = "date_desc"
+
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
+SIMILAR_ITEMS_LIMIT = 5
 
 # ---------------------------------------------------------------------------
 # Pydantic schemas
@@ -124,6 +130,16 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+class PaginatedItemsOut(BaseModel):
+    """Paginated list of items plus pagination metadata."""
+    items: List[ItemOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    has_next: bool
+    has_previous: bool
+
 # ---------------------------------------------------------------------------
 # Items DB helpers
 # ---------------------------------------------------------------------------
@@ -139,31 +155,74 @@ def _serialize_row(row) -> dict:
             d[key] = value.isoformat()
     return d
 
+def _escape_like(value: str) -> str:
+    """Escape LIKE wildcards so user input is matched literally."""
+    return (
+        value.replace("\\", "\\\\")
+             .replace("%", "\\%")
+             .replace("_", "\\_")
+    )
 
-def get_all_items(category: Optional[str] = None, sort: Optional[str] = None) -> List[dict]:
-    """Return every item, optionally filtered by category and sorted (default: newest first)."""
+def get_items_page(
+    category: Optional[str] = None,
+    sort: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE,
+) -> dict:
+    """
+    Return one page of items (optionally filtered by category / search and sorted,
+    default: newest first) together with pagination metadata.
+    """
 
     order_by = SORT_OPTIONS.get(sort, SORT_OPTIONS[DEFAULT_SORT])
 
-    query = "SELECT * FROM items"
-    params = ()
+    conditions: List[str] = []
+    params: List[str] = []
 
     if category:
-        query += " WHERE category = %s"
-        params = (category,)
+        conditions.append("category = %s")
+        params.append(category)
 
-    query += f" ORDER BY {order_by}"
+    if search and search.strip():
+        pattern = f"%{_escape_like(search.strip())}%"
+        conditions.append("(title LIKE %s OR description LIKE %s)")
+        params.extend([pattern, pattern])
+
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+    offset = (page - 1) * page_size
+
+    count_query = f"SELECT COUNT(*) AS total FROM items{where}"
+    items_query = (
+        f"SELECT * FROM items{where} "
+        f"ORDER BY {order_by}, id DESC LIMIT %s OFFSET %s"
+    )
 
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute(query, params)
+        cursor.execute(count_query, params)
+        row = cursor.fetchone()
+        # fetchone() is typed as a union of row shapes; with dictionary=True it is a dict
+        total = cast(int, row["total"]) if isinstance(row, dict) else 0
+
+        cursor.execute(items_query, params + [page_size, offset])
         rows = cursor.fetchall()
     finally:
         cursor.close()
         conn.close()
 
-    return [_serialize_row(r) for r in rows]
+    total_pages = math.ceil(total / page_size)
+
+    return {
+        "items": [_serialize_row(r) for r in rows],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_previous": page > 1,
+    }
 
 
 def get_item_by_id(item_id: int) -> Optional[dict]:
@@ -178,6 +237,26 @@ def get_item_by_id(item_id: int) -> Optional[dict]:
         return None
     return _serialize_row(row)
 
+def get_similar_items(item_id: int) -> Optional[list[dict]]:
+    """Newest items sharing the item's category, excluding the item itself.
+    Returns None if the item does not exist."""
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT category FROM items WHERE id = %s", (item_id,))
+        row = cast(Optional[dict], cursor.fetchone())
+        if row is None:
+            return None
+
+        cursor.execute(
+            "SELECT * FROM items WHERE category = %s AND id <> %s "
+            "ORDER BY created_at DESC, id DESC LIMIT %s",
+            (row["category"], item_id, SIMILAR_ITEMS_LIMIT),
+        )
+        return [_serialize_row(r) for r in cursor.fetchall()]
+    finally:
+        cursor.close()
+        conn.close()
 
 def create_item(item: ItemCreate, seller: dict) -> dict:
     """Insert a new item and return it (with generated id and timestamp)."""

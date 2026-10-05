@@ -6,7 +6,7 @@ Run with:
 """
 
 import logging
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +21,8 @@ load_dotenv()
 
 from database import init_db, get_db
 from models import (
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
     ItemCreate, 
     ItemOut, 
     CategoryOut,
@@ -30,9 +32,11 @@ from models import (
     SellerOut,
     TokenOut,
     UsernameTakenError,
+    PaginatedItemsOut,
     _serialize_row, 
-    get_all_items, 
+    get_items_page, 
     get_item_by_id, 
+    get_similar_items,
     create_item, 
     get_all_categories,
     create_seller,
@@ -106,10 +110,31 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # ---------- Item Endpoints ----------
 
 
-@app.get("/items", response_model=list[ItemOut])
-def list_items(category: Optional[str] = None, sort: Optional[str] = None):
+@app.get("/items", response_model=PaginatedItemsOut)
+def list_items(
+    category: Optional[str] = None,
+    sort: Optional[str] = None,
+    search: Optional[str] = Query(
+        None,
+        max_length=100,
+        description="Case-insensitive search on item title and description",
+    ),
+    page: int = Query(1, ge=1, description="Page number, starting at 1"),
+    page_size: int = Query(
+        DEFAULT_PAGE_SIZE,
+        ge=1,
+        le=MAX_PAGE_SIZE,
+        description=f"Items per page (max {MAX_PAGE_SIZE})",
+    ),
+):
     """Return all marketplace items, newest first."""
-    return get_all_items(category, sort)
+    return get_items_page(
+        category=category,
+        sort=sort,
+        search=search,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @app.get("/items/{item_id}", response_model=ItemOut)
@@ -120,6 +145,13 @@ def item_detail(item_id: int):
         raise HTTPException(status_code=404, detail="Item not found")
     return item
 
+@app.get("/items/{item_id}/similar", response_model=list[ItemOut])
+def similar_items(item_id: int):
+    """Up to 5 newest items in the same category as `item_id`, excluding itself."""
+    items = get_similar_items(item_id)
+    if items is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return items
 
 @app.post("/items", response_model=ItemOut, status_code=201)
 def add_item(item: ItemCreate, current_seller: dict = Depends(get_current_user)):

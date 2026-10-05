@@ -23,8 +23,9 @@ def test_get_items(client):
     response = client.get("/items")
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data, list)
-    assert len(data) >= 3  # seeded in conftest
+    assert isinstance(data["items"], list)
+    assert len(data["items"]) >= 3  # seeded in conftest
+    assert data["total"] >= 3
 
 
 def test_get_item_by_id(client):
@@ -55,7 +56,7 @@ def test_filter_by_category(client):
     """
     response = client.get("/items?category=Books")
     assert response.status_code == 200
-    data = response.json()
+    data = response.json()["items"]
     assert len(data) > 0
     for item in data:
         assert item["category"] == "Books"
@@ -69,7 +70,7 @@ def test_sort_items(client):
     """
     response = client.get("/items?sort=price_asc")
     assert response.status_code == 200
-    data = response.json()
+    data = response.json()["items"]
     prices = [item["price"] for item in data]
     assert prices == sorted(prices)
 
@@ -95,7 +96,7 @@ MISSING_ITEM_ID = 9999
 
 
 def item_count(client):
-    return len(client.get("/items").json())
+    return client.get("/items").json()["total"]
 
 
 @pytest.fixture
@@ -206,7 +207,7 @@ def test_create_item_is_persisted(client, owner):
 
 
 def test_create_item_is_listed_for_anonymous_visitors(client, owned_item):
-    ids = [item["id"] for item in client.get("/items").json()]
+    ids = [item["id"] for item in client.get("/items").json()["items"]]
     assert owned_item["id"] in ids
 
 
@@ -406,7 +407,7 @@ def test_owner_can_delete_item(client, owner, owned_item):
     assert response.status_code == 200
     assert response.json() == {"message": "Item deleted"}
     assert client.get(url).status_code == 404
-    assert owned_item["id"] not in [i["id"] for i in client.get("/items").json()]
+    assert owned_item["id"] not in [i["id"] for i in client.get("/items").json()["items"]]
 
 
 def test_delete_only_removes_the_targeted_item(client, owner, owned_item):
