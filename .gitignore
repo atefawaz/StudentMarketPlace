@@ -41,3 +41,5 @@ ios/Pods/
 .pytest_cache/
 htmlcov/
 .coverage
+
+.env

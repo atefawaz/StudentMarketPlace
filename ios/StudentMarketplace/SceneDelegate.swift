@@ -23,6 +23,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = nav
         self.window = window
         window.makeKeyAndVisible()
+
+            // Restore a saved session (if any) on launch.
+        Session.shared.restore()
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {

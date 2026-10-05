@@ -12,6 +12,19 @@ class ItemListViewController: UITableViewController {
         }
     }
     
+    // MARK: - Pagination state
+    private let pageSize = 5
+    private let loadMoreThreshold = 5          // start loading when 5 rows from the end
+    private var currentPage = 0
+    private var hasNextPage = false
+    private var isLoading = false
+    
+    private var requestGeneration = 0          // invalidates in-flight responses
+    private var needsReload = false
+
+    private enum FooterState { case hidden, loading, retry }
+    private var footerState: FooterState = .hidden
+    
     private lazy var sortButton: UIBarButtonItem = {
         let item = UIBarButtonItem(
             image: UIImage(systemName: "arrow.up.arrow.down.circle"),
@@ -37,42 +50,130 @@ class ItemListViewController: UITableViewController {
         )
         
         navigationItem.rightBarButtonItems = [addButton, sortButton]
+        
         updateSortButton()
+        refreshAuthUI()
+        
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(sessionChanged),
+            name: .sessionChanged, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(sessionDidExpire),
+            name: .sessionExpired, object: nil
+        )
+        
+        refreshControl = UIRefreshControl()
+        refreshControl?.addTarget(self, action: #selector(pullToRefresh), for: .valueChanged)
         
         loadCategories()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        print("list reappeared, reloading")
-        loadItems()
+        refreshAuthUI()
+        if items.isEmpty || needsReload {
+            needsReload = false
+            reloadItems()
+        }
+    }
+    
+    
+    private func refreshAuthUI() {
+        // Ensure UI work always happens on the main thread, whoever called us.
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.refreshAuthUI() }
+            return
+        }
+
+        if let seller = Session.shared.currentSeller {
+            navigationItem.leftBarButtonItem = UIBarButtonItem(
+                title: "Log out",
+                style: .plain,
+                target: self,
+                action: #selector(logoutTapped)
+            )
+            title = seller.username
+        } else {
+            navigationItem.leftBarButtonItem = UIBarButtonItem(
+                title: "Log in",
+                style: .plain,
+                target: self,
+                action: #selector(openAuth)
+            )
+            title = "Marketplace"
+        }
     }
 
     // MARK: - Data loading
-
-    private func loadItems() {
-        let requestedCategory = selectedCategory
-        let requestSort = selectedSort
-
-        APIClient.getItems(category: requestedCategory, order_by: requestSort.rawValue) { [weak self] result in
+    
+    /// Starts over from page 1 (category/sort change, pull-to-refresh, logout…).
+    private func reloadItems() {
+        requestGeneration += 1      // any in-flight response is now stale
+        isLoading = false
+        fetchPage(1)
+    }
+    
+    private func loadNextPage() {
+        guard hasNextPage, !isLoading else { return }
+        fetchPage(currentPage + 1)
+    }
+    
+    private func fetchPage(_ page: Int) {
+        let generation = requestGeneration
+        isLoading = true
+        setFooter(page == 1 ? .hidden : .loading)
+        
+        APIClient.getItems(
+            category: selectedCategory,
+            order_by: selectedSort.rawValue,
+            page: page,
+            pageSize: pageSize
+        ) { [weak self] result in
             DispatchQueue.main.async {
-                guard let self, requestedCategory == self.selectedCategory, requestSort == self.selectedSort else { return }
-
+                guard let self, generation == self.requestGeneration else { return }
+                self.isLoading = false
+                self.refreshControl?.endRefreshing()
+                
                 switch result {
-                case .success(let items):
-                    self.items = items
-                    self.tableView.reloadData()
+                case .success(let response):
+                    self.currentPage = page
+                    self.hasNextPage = response.hasNext
+                    self.setFooter(.hidden)
+                    if page == 1 {
+                        self.items = response.items
+                        self.tableView.reloadData()
+                    } else {
+                        self.appendItems(response.items)
+                    }
+                
                 case .failure(let error):
-                    let alert = UIAlertController(
-                        title: "Error",
-                        message: error.localizedDescription,
-                        preferredStyle: .alert
-                    )
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    self.present(alert, animated: true)
+                    if page == 1 {
+                        let alert = UIAlertController(
+                            title: "Error",
+                            message: error.localizedDescription,
+                            preferredStyle: .alert
+                        )
+                        alert.addAction(UIAlertAction(title: "OK", style: .default))
+                        self.present(alert, animated: true)
+                    } else {
+                        self.setFooter(.retry)
+                    }
                 }
             }
         }
+    }
+    
+    private func appendItems(_ newItems: [Item]) {
+        // Offset pagination can repeat rows if items were added between requests.
+        let existingIds = Set(items.map(\.id))
+        let fresh = newItems.filter { !existingIds.contains($0.id) }
+        guard !fresh.isEmpty else { return }
+
+        let start = items.count
+        items.append(contentsOf: fresh)
+        let indexPaths = (start..<items.count).map { IndexPath(row: $0, section: 0) }
+        tableView.insertRows(at: indexPaths, with: .none)
     }
     
     private func loadCategories() {
@@ -84,7 +185,8 @@ class ItemListViewController: UITableViewController {
                 row.setCategories(categories)
                 row.onCategorySelected = { [weak self] category in
                     self?.selectedCategory = category
-                    self?.loadItems()
+                    self?.scrollToTop()
+                    self?.reloadItems()
                 }
                 self?.tableView.tableHeaderView = row
             }
@@ -150,12 +252,88 @@ class ItemListViewController: UITableViewController {
         detailVC.itemId = item.id
         navigationController?.pushViewController(detailVC, animated: true)
     }
+    
+    override func tableView(_ tableView: UITableView,
+                            willDisplay cell: UITableViewCell,
+                            forRowAt indexPath: IndexPath) {
+        guard hasNextPage, !isLoading, footerState != .retry,
+              indexPath.row >= items.count - loadMoreThreshold else { return }
+
+        // Hop out of the layout pass before touching the footer.
+        DispatchQueue.main.async { [weak self] in self?.loadNextPage() }
+    }
+    
+    // MARK: - Footer
+    
+    private func setFooter(_ state: FooterState) {
+        footerState = state
+        switch state {
+        case .hidden:
+            tableView.tableFooterView = nil
+            
+        case .loading:
+            let spinner = UIActivityIndicatorView(style: .medium)
+            spinner.frame = CGRect(x: 0, y: 0, width: tableView.bounds.width, height: 56)
+            spinner.startAnimating()
+            tableView.tableFooterView = spinner
+            
+        case .retry:
+            var config = UIButton.Configuration.plain()
+            config.title = "Couldn’t load more items. Tap to retry"
+            config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
+                var attrs = attrs
+                attrs.font = .preferredFont(forTextStyle: .footnote)
+                return attrs
+            }
+            let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
+                self?.loadNextPage()
+            })
+            button.frame = CGRect(x: 0, y: 0, width: tableView.bounds.width, height: 56)
+            tableView.tableFooterView = button
+        }
+    }
 
     // MARK: - Actions
 
     @objc private func openCreateItem() {
+        
+        // Gate: creating an item requires being logged in.
+            guard Session.shared.currentSeller != nil else {
+                openAuth()   // not logged in → show the auth screen instead
+                return
+            }
+        
+        needsReload = true
         let createVC = CreateItemViewController()
         navigationController?.pushViewController(createVC, animated: true)
+    }
+    
+    @objc private func openAuth() {
+        guard presentedViewController == nil else { return }
+        let authVC = AuthViewController()
+        let nav = UINavigationController(rootViewController: authVC)
+        present(nav, animated: true)
+    }
+    
+    @objc private func logoutTapped() {
+        Session.shared.logout()
+        refreshAuthUI()
+        reloadItems()
+    }
+    
+    @objc private func sessionChanged() {
+        refreshAuthUI()
+    }
+
+    @objc private func sessionDidExpire() {
+        refreshAuthUI()
+        let alert = UIAlertController(
+            title: "Session expired",
+            message: "Please log in again.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
     
     @objc private func openSortSheet() {
@@ -163,8 +341,12 @@ class ItemListViewController: UITableViewController {
             guard let self else { return }
             self.selectedSort = option
             self.scrollToTop()
-            self.loadItems()
+            self.reloadItems()
         }
         present(sheet, animated: true)
+    }
+    
+    @objc private func pullToRefresh() {
+        reloadItems()
     }
 }

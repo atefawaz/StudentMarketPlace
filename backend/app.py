@@ -6,28 +6,51 @@ Run with:
 """
 
 import logging
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
+from dotenv import load_dotenv
 from typing import Optional
 import html as html_lib
 
+from utilities import get_required_env
+
+load_dotenv()
+
 from database import init_db, get_db
 from models import (
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
     ItemCreate, 
     ItemOut, 
     CategoryOut,
+    ItemSoldUpdate,
+    LoginRequest,
+    RegisterRequest,
+    SellerOut,
+    TokenOut,
+    UsernameTakenError,
+    PaginatedItemsOut,
     _serialize_row, 
-    get_all_items, 
+    get_items_page, 
     get_item_by_id, 
+    get_similar_items,
     create_item, 
     get_all_categories,
-    ItemSoldUpdate
+    create_seller,
+    get_seller_by_username,
 )
 
-SECRET_KEY = "super-secret-key-123"
+from auth import (
+    DUMMY_HASH,
+    create_token,
+    get_current_user,
+    hash_password,
+    verify_password,
+    require_item_owner,
+)
 
 app = FastAPI(
     title="Student Marketplace API",
@@ -80,10 +103,31 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # ---------- Item Endpoints ----------
 
 
-@app.get("/items", response_model=list[ItemOut])
-def list_items(category: Optional[str] = None, sort: Optional[str] = None):
+@app.get("/items", response_model=PaginatedItemsOut)
+def list_items(
+    category: Optional[str] = None,
+    sort: Optional[str] = None,
+    search: Optional[str] = Query(
+        None,
+        max_length=100,
+        description="Case-insensitive search on item title and description",
+    ),
+    page: int = Query(1, ge=1, description="Page number, starting at 1"),
+    page_size: int = Query(
+        DEFAULT_PAGE_SIZE,
+        ge=1,
+        le=MAX_PAGE_SIZE,
+        description=f"Items per page (max {MAX_PAGE_SIZE})",
+    ),
+):
     """Return all marketplace items, newest first."""
-    return get_all_items(category, sort)
+    return get_items_page(
+        category=category,
+        sort=sort,
+        search=search,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @app.get("/items/{item_id}", response_model=ItemOut)
@@ -94,11 +138,18 @@ def item_detail(item_id: int):
         raise HTTPException(status_code=404, detail="Item not found")
     return item
 
+@app.get("/items/{item_id}/similar", response_model=list[ItemOut])
+def similar_items(item_id: int):
+    """Up to 5 newest items in the same category as `item_id`, excluding itself."""
+    items = get_similar_items(item_id)
+    if items is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return items
 
 @app.post("/items", response_model=ItemOut, status_code=201)
-def add_item(item: ItemCreate):
+def add_item(item: ItemCreate, current_seller: dict = Depends(get_current_user)):
     """Create a new marketplace listing."""
-    return create_item(item)
+    return create_item(item, current_seller)
 
 # ---------- Category Endpoints ----------
 
@@ -141,9 +192,9 @@ def admin_page():
     return HTMLResponse(content=html)
 
 
-# ---------- Delete item (no auth) ----------
+# ---------- Delete item (owner only) ----------
 
-@app.delete("/items/{item_id}")
+@app.delete("/items/{item_id}", dependencies=[Depends(require_item_owner)])
 def delete_item(item_id: int):
     conn = get_db()
     cursor = conn.cursor()
@@ -155,27 +206,76 @@ def delete_item(item_id: int):
 
 
 
-@app.patch("/items/{item_id}" , response_model=ItemOut)
+@app.patch("/items/{item_id}" , response_model=ItemOut, dependencies=[Depends(require_item_owner)])
 def update_item_sold(item_id: int, payload: ItemSoldUpdate):
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("UPDATE items SET is_sold = %s WHERE id = %s", (payload.is_sold, item_id))
-    conn.commit()
-    cursor.execute("SELECT * FROM items WHERE id = %s", (item_id,))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return _serialize_row(row)
 
+    try:
+        # atomic: only touches the row if the state actually changes
+        cursor.execute(
+            "UPDATE items SET is_sold = %s WHERE id = %s AND NOT (is_sold <=> %s)",
+            (payload.is_sold, item_id, payload.is_sold),
+        )
 
-  
+        # if no rows were updated
+        if cursor.rowcount == 0:
+            conn.rollback()
 
+            cursor.execute("SELECT id FROM items WHERE id = %s", (item_id,))
+            if cursor.fetchone() is None:
+                raise HTTPException(status_code=404, detail="Item not found")
+            
+            state = "sold" if payload.is_sold else "available"
 
-@app.post("/sellers/register")
-def register_seller(data: dict):
-    name = data.get("name", "")
-    email = data.get("email", "")
-    logging.info(f"New seller registered: {name} ({email})")
-    return {"message": f"Seller {name} registered"}
+            raise HTTPException(status_code=409, detail=f"Item is already {state}")
+
+        cursor.execute("SELECT * FROM items WHERE id = %s", (item_id,))
+        row = cursor.fetchone()
+        conn.commit()
+        return _serialize_row(row)
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+# ---------- Auth Endpoints ----------
+
+@app.post("/auth/register", response_model=SellerOut, status_code=201)
+def register(data: RegisterRequest):
+    try:
+        return create_seller(
+            username=data.username,
+            password_hash=hash_password(data.password),
+            display_name=data.display_name,
+            email=data.email,
+        )
+    except UsernameTakenError:
+        raise HTTPException(status_code=409, detail="Username already taken")
+
+@app.post("/auth/login", response_model=TokenOut)
+def login(data: LoginRequest):
+    seller = get_seller_by_username(data.username)
+    password_ok = verify_password(
+        data.password,
+        seller["password_hash"] if seller else DUMMY_HASH
+    )
+
+    if seller is None or not password_ok:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return TokenOut(access_token=create_token(seller["id"]))
+
+@app.get("/auth/me", response_model=SellerOut)
+def me(current_seller: dict = Depends(get_current_user)):
+    return current_seller
