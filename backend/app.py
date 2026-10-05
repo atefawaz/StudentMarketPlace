@@ -36,6 +36,7 @@ from models import (
     _serialize_row, 
     get_items_page, 
     get_item_by_id, 
+    get_similar_items,
     create_item, 
     get_all_categories,
     create_seller,
@@ -144,6 +145,13 @@ def item_detail(item_id: int):
         raise HTTPException(status_code=404, detail="Item not found")
     return item
 
+@app.get("/items/{item_id}/similar", response_model=list[ItemOut])
+def similar_items(item_id: int):
+    """Up to 5 newest items in the same category as `item_id`, excluding itself."""
+    items = get_similar_items(item_id)
+    if items is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return items
 
 @app.post("/items", response_model=ItemOut, status_code=201)
 def add_item(item: ItemCreate, current_seller: dict = Depends(get_current_user)):

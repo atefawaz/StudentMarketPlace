@@ -32,6 +32,7 @@ DEFAULT_SORT: str = "date_desc"
 
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
+SIMILAR_ITEMS_LIMIT = 5
 
 # ---------------------------------------------------------------------------
 # Pydantic schemas
@@ -236,6 +237,26 @@ def get_item_by_id(item_id: int) -> Optional[dict]:
         return None
     return _serialize_row(row)
 
+def get_similar_items(item_id: int) -> Optional[list[dict]]:
+    """Newest items sharing the item's category, excluding the item itself.
+    Returns None if the item does not exist."""
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT category FROM items WHERE id = %s", (item_id,))
+        row = cast(Optional[dict], cursor.fetchone())
+        if row is None:
+            return None
+
+        cursor.execute(
+            "SELECT * FROM items WHERE category = %s AND id <> %s "
+            "ORDER BY created_at DESC, id DESC LIMIT %s",
+            (row["category"], item_id, SIMILAR_ITEMS_LIMIT),
+        )
+        return [_serialize_row(r) for r in cursor.fetchall()]
+    finally:
+        cursor.close()
+        conn.close()
 
 def create_item(item: ItemCreate, seller: dict) -> dict:
     """Insert a new item and return it (with generated id and timestamp)."""
