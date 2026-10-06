@@ -11,6 +11,7 @@ import Foundation
 extension Notification.Name {
     static let sessionExpired = Notification.Name("sessionExpired")
     static let sessionChanged = Notification.Name("sessionChanged")
+    static let itemUpdated = Notification.Name("itemUpdated")
 }
 
 enum APIError : LocalizedError{
@@ -149,6 +150,35 @@ class APIClient {
             }
         }.resume()
     }
+    
+    // MARK: - GET /items/{id}/similar
+
+    /// Fetch items similar to the given item.
+    static func getSimilarItems(id: Int,
+                                completion: @escaping (Result<[Item], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/items/\(id)/similar") else {
+            completion(.failure(URLError(.badURL)))
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            switch handle(data: data, response: response, error: error) {
+            case .success(let data):
+                do {
+                    let items = try JSONDecoder().decode([Item].self, from: data)
+                    completion(.success(items))
+                } catch {
+                    completion(.failure(error))
+                }
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+    
     // MARK: - POST /items
 
     /// Create a new item.
