@@ -2,9 +2,11 @@ import UIKit
 
 /// Displays the list of marketplace items in a UITableView.
 class ItemListViewController: UITableViewController {
-
+    
     private var items: [Item] = []
     private var selectedCategory: String? // nil = "All"
+    private var searchText: String? // nil or empty no search
+    private var searchDebounce: Timer?
     private var selectedSort: ItemSortOption = .saved {
         didSet {
             ItemSortOption.saved = selectedSort
@@ -21,7 +23,7 @@ class ItemListViewController: UITableViewController {
     
     private var requestGeneration = 0          // invalidates in-flight responses
     private var needsReload = false
-
+    
     private enum FooterState { case hidden, loading, retry }
     private var footerState: FooterState = .hidden
     
@@ -36,12 +38,12 @@ class ItemListViewController: UITableViewController {
         item.accessibilityValue = selectedSort.title
         return item
     }()
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Marketplace"
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "ItemCell")
-
+        
         // "+" button to create a new item
         let addButton = UIBarButtonItem(
             barButtonSystemItem: .add,
@@ -50,6 +52,12 @@ class ItemListViewController: UITableViewController {
         )
         
         navigationItem.rightBarButtonItems = [addButton, sortButton]
+        let search = UISearchController(searchResultsController: nil)
+        search.searchResultsUpdater = self
+        search.obscuresBackgroundDuringPresentation = false
+        search.searchBar.placeholder = "Search items"
+        navigationItem.searchController = search
+        navigationItem.hidesSearchBarWhenScrolling = false
         
         updateSortButton()
         refreshAuthUI()
@@ -72,7 +80,7 @@ class ItemListViewController: UITableViewController {
         
         loadCategories()
     }
-
+    
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         refreshAuthUI()
@@ -89,7 +97,7 @@ class ItemListViewController: UITableViewController {
             DispatchQueue.main.async { [weak self] in self?.refreshAuthUI() }
             return
         }
-
+        
         if let seller = Session.shared.currentSeller {
             navigationItem.leftBarButtonItem = UIBarButtonItem(
                 title: "Log out",
@@ -108,7 +116,7 @@ class ItemListViewController: UITableViewController {
             title = "Marketplace"
         }
     }
-
+    
     // MARK: - Data loading
     
     /// Starts over from page 1 (category/sort change, pull-to-refresh, logout…).
@@ -131,6 +139,7 @@ class ItemListViewController: UITableViewController {
         APIClient.getItems(
             category: selectedCategory,
             order_by: selectedSort.rawValue,
+            search : searchText,
             page: page,
             pageSize: pageSize
         ) { [weak self] result in
@@ -150,7 +159,7 @@ class ItemListViewController: UITableViewController {
                     } else {
                         self.appendItems(response.items)
                     }
-                
+                    
                 case .failure(let error):
                     if page == 1 {
                         let alert = UIAlertController(
@@ -173,7 +182,7 @@ class ItemListViewController: UITableViewController {
         let existingIds = Set(items.map(\.id))
         let fresh = newItems.filter { !existingIds.contains($0.id) }
         guard !fresh.isEmpty else { return }
-
+        
         let start = items.count
         items.append(contentsOf: fresh)
         let indexPaths = (start..<items.count).map { IndexPath(row: $0, section: 0) }
@@ -208,18 +217,18 @@ class ItemListViewController: UITableViewController {
         tableView.setContentOffset(CGPoint(x: 0, y: -tableView.adjustedContentInset.top),
                                    animated: false)
     }
-
+    
     // MARK: - UITableViewDataSource
-
+    
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         items.count
     }
-
+    
     override func tableView(_ tableView: UITableView,
                             cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ItemCell", for: indexPath)
         let item = items[indexPath.row]
-
+        
         var config = cell.defaultContentConfiguration()
         config.text = item.title
         config.secondaryText = "\(item.formattedPrice) — \(item.category)"
@@ -235,7 +244,7 @@ class ItemListViewController: UITableViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         guard let header = tableView.tableHeaderView else { return }
-
+        
         let size = header.systemLayoutSizeFitting(
             CGSize(width: tableView.bounds.width, height: UIView.layoutFittingCompressedSize.height),
             withHorizontalFittingPriority: .required,
@@ -248,7 +257,7 @@ class ItemListViewController: UITableViewController {
     }
     
     // MARK: - UITableViewDelegate
-
+    
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let item = items[indexPath.row]
@@ -262,7 +271,7 @@ class ItemListViewController: UITableViewController {
                             forRowAt indexPath: IndexPath) {
         guard hasNextPage, !isLoading, footerState != .retry,
               indexPath.row >= items.count - loadMoreThreshold else { return }
-
+        
         // Hop out of the layout pass before touching the footer.
         DispatchQueue.main.async { [weak self] in self?.loadNextPage() }
     }
@@ -296,16 +305,16 @@ class ItemListViewController: UITableViewController {
             tableView.tableFooterView = button
         }
     }
-
+    
     // MARK: - Actions
-
+    
     @objc private func openCreateItem() {
         
         // Gate: creating an item requires being logged in.
-            guard Session.shared.currentSeller != nil else {
-                openAuth()   // not logged in → show the auth screen instead
-                return
-            }
+        guard Session.shared.currentSeller != nil else {
+            openAuth()   // not logged in → show the auth screen instead
+            return
+        }
         
         needsReload = true
         let createVC = CreateItemViewController()
@@ -328,7 +337,7 @@ class ItemListViewController: UITableViewController {
     @objc private func sessionChanged() {
         refreshAuthUI()
     }
-
+    
     @objc private func sessionDidExpire() {
         refreshAuthUI()
         let alert = UIAlertController(
@@ -361,3 +370,21 @@ class ItemListViewController: UITableViewController {
         reloadItems()
     }
 }
+    
+    extension ItemListViewController: UISearchResultsUpdating {
+        func updateSearchResults(for searchController: UISearchController) {
+            let text = searchController.searchBar.text?.trimmingCharacters(in: .whitespaces)
+
+            // Debounce: cancel the previous pending search, schedule a new one.
+            searchDebounce?.invalidate()
+            searchDebounce = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
+                guard let self else { return }
+                let newValue = (text?.isEmpty ?? true) ? nil : text
+                guard newValue != self.searchText else { return }   
+                self.searchText = newValue
+                self.scrollToTop()
+                self.reloadItems()
+            }
+        }
+    }
+

@@ -75,6 +75,7 @@ class APIClient {
     /// Fetch marketplace items, optionally filtered by category.
     static func getItems(category: String? = nil,
                          order_by: String? = nil,
+                         search: String? = nil,
                          page: Int = 1,
                          pageSize: Int = 20,
                          completion: @escaping (Result<ItemsPage, Error>) -> Void) {
@@ -86,6 +87,9 @@ class APIClient {
         var queryItems: [URLQueryItem] = []
         if let category { queryItems.append(URLQueryItem(name: "category", value: category)) }
         if let order_by { queryItems.append(URLQueryItem(name: "sort", value: order_by)) }
+        if let search, !search.isEmpty {                 
+                queryItems.append(URLQueryItem(name: "search", value: search))
+            }
         queryItems.append(URLQueryItem(name: "page", value: String(page)))
         queryItems.append(URLQueryItem(name: "page_size", value: String(pageSize)))
         components.queryItems = queryItems
