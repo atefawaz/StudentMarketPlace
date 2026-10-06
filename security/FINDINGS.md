@@ -39,9 +39,9 @@
 ## Deployment & hardening (Phase 4)
 | ID | Task | Status | Evidence |
 |----|------|--------|----------|
-| C025 | Fix SQL injection | done | C025 report — parameterised plain-string query verified |
+| C025 | Fix SQL injection | done | C025 report — parameterised query verified |
 | C026 | Add authentication + fix IDOR | done | C026 report — auth + ownership verified |
-| C027 | Secure configuration | done | C027 report — bcrypt + env secret + header removal verified |
-| C028 | Security headers + rate limiting | todo | — |
-| C029 | Structured logging + alerting | todo | — |
-| C030 | Final audit report | todo | — |
+| C027 | Secure configuration | done | C027 report — bcrypt + env secret + header verified |
+| C028 | Security headers + rate limiting | open | reviewed; headers done by SE, rate-limiting filed |
+| C029 | Structured logging + alerting | open | reviewed; filed for SE with detailed remediation |
+| C030 | Final audit report | done | C030-final-report.md (+ PDF/Word) |
