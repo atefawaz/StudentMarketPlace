@@ -17,6 +17,8 @@ class ItemDetailViewController: UIViewController {
     private let soldButton = UIButton(type: .system)
     private var currentItem: Item?
     
+    private var similarItems: [Item] = []
+    
     private let scrollView = UIScrollView()
     private let similarSection = UIStackView()
     private let similarTitleLabel = UILabel()
@@ -38,7 +40,28 @@ class ItemDetailViewController: UIViewController {
         title = "Item Detail"
         view.backgroundColor = .systemBackground
         setupUI()
+        
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(itemDidUpdate(_:)),
+            name: .itemUpdated, object: nil
+        )
+        
         loadItem()
+    }
+    
+    @objc private func itemDidUpdate(_ notification: Notification) {
+        guard let updated = notification.userInfo?["item"] as? Item else { return }
+
+        // This screen shows the item that changed (e.g. the older copy of A in the stack)
+        if updated.id == itemId {
+            populate(with: updated)
+        }
+
+        // A similar-items card shows the item that changed
+        if let index = similarItems.firstIndex(where: { $0.id == updated.id }) {
+            similarItems[index] = updated
+            showSimilar(similarItems)
+        }
     }
     
 //    Loading the data
@@ -271,6 +294,7 @@ class ItemDetailViewController: UIViewController {
     }
 
     private func showSimilar(_ items: [Item]) {
+        similarItems = items
         similarStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         for item in items {
