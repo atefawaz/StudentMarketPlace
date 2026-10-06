@@ -95,6 +95,7 @@ class ItemDetailViewController: UIViewController {
                 switch result {
                 case .success(let item):
                     self.populate(with: item)     // re-draws badge + button label
+                    NotificationCenter.default.post(name: .itemUpdated, object: nil, userInfo: ["item": item])
                 case .failure(let error):
                     if case APIError.forbidden = error {
                         let alert = UIAlertController(

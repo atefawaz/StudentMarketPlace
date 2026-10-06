@@ -62,6 +62,10 @@ class ItemListViewController: UITableViewController {
             self, selector: #selector(sessionDidExpire),
             name: .sessionExpired, object: nil
         )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(itemDidUpdate(_:)),
+            name: .itemUpdated, object: nil
+        )
         
         refreshControl = UIRefreshControl()
         refreshControl?.addTarget(self, action: #selector(pullToRefresh), for: .valueChanged)
@@ -334,6 +338,13 @@ class ItemListViewController: UITableViewController {
         )
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
+    }
+    
+    @objc private func itemDidUpdate(_ notification: Notification) {
+        guard let updated = notification.userInfo?["item"] as? Item,
+              let row = items.firstIndex(where: { $0.id == updated.id }) else { return }
+        items[row] = updated
+        tableView.reloadRows(at: [IndexPath(row: row, section: 0)], with: .none)
     }
     
     @objc private func openSortSheet() {
