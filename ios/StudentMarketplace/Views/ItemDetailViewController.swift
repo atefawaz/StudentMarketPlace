@@ -1,11 +1,6 @@
 import UIKit
 
 /// Detail screen for a single marketplace item.
-///
-/// TODO: Fetch item data from GET /items/{id} using APIClient.getItem().
-/// TODO: Display title, description, price, category, seller name, date.
-/// TODO: Show a "SOLD" badge if the item is sold.
-/// TODO: Add a "Mark as sold" button that calls PATCH /items/{id}.
 class ItemDetailViewController: UIViewController {
 
     /// Set by the presenting view controller before navigation.
@@ -21,6 +16,12 @@ class ItemDetailViewController: UIViewController {
     private let soldBadge = UILabel()
     private let soldButton = UIButton(type: .system)
     private var currentItem: Item?
+    
+    private let scrollView = UIScrollView()
+    private let similarSection = UIStackView()
+    private let similarTitleLabel = UILabel()
+    private let similarScrollView = UIScrollView()
+    private let similarStack = UIStackView()
     
     private let spinner = UIActivityIndicatorView(style: .large)
     private let errorLabel = UILabel()
@@ -51,6 +52,7 @@ class ItemDetailViewController: UIViewController {
                     case .success(let item):
                         self.populate(with: item)
                         self.setState(.loaded)
+                        self.loadSimilarItems()
                     case .failure(let error):
                         self.setState(.error(error))
                     }
@@ -142,17 +144,17 @@ class ItemDetailViewController: UIViewController {
         switch state {
         case .loading :
             spinner.startAnimating()
-            stack.isHidden = true
+            scrollView.isHidden = true
             errorStack.isHidden = true
             
         case .loaded :
             spinner.stopAnimating()
-            stack.isHidden = false
+            scrollView.isHidden = false
             errorStack.isHidden = true
             
         case .error(let error) :
             spinner.stopAnimating()
-            stack.isHidden = true
+            scrollView.isHidden = true
             errorStack.isHidden = false
             errorLabel.text = error.localizedDescription
         }
@@ -160,18 +162,18 @@ class ItemDetailViewController: UIViewController {
     
     // Layout
     private func setupUI() {
+        // MARK: Main stack
         stack.axis = .vertical
         stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
-        
+
         titleLabel.font = .preferredFont(forTextStyle: .title1)
         titleLabel.numberOfLines = 0
         descriptionLabel.numberOfLines = 0
-        
-        [soldBadge , titleLabel, priceLabel, categoryLabel, sellerLabel, dateLabel, descriptionLabel , soldButton]
-                    .forEach { stack.addArrangedSubview($0) }
-        
-        
+
+        [soldBadge, titleLabel, priceLabel, categoryLabel, sellerLabel, dateLabel, descriptionLabel, soldButton]
+            .forEach { stack.addArrangedSubview($0) }
+
         soldBadge.text = " SOLD "
         soldBadge.font = .boldSystemFont(ofSize: 28)
         soldBadge.textColor = .white
@@ -180,11 +182,40 @@ class ItemDetailViewController: UIViewController {
         soldBadge.layer.cornerRadius = 8
         soldBadge.clipsToBounds = true
         soldBadge.isHidden = true
+
         soldButton.configuration = .borderedProminent()
         soldButton.addTarget(self, action: #selector(soldButtonTapped), for: .touchUpInside)
+
+        // MARK: Similar items section (last block of the main stack)
+        similarTitleLabel.text = "Similar items"
+        similarTitleLabel.font = .preferredFont(forTextStyle: .title3)
+        similarTitleLabel.adjustsFontForContentSizeCategory = true
+
+        similarStack.axis = .horizontal
+        similarStack.spacing = 12
+        similarStack.translatesAutoresizingMaskIntoConstraints = false
+
+        similarScrollView.showsHorizontalScrollIndicator = false
+        similarScrollView.addSubview(similarStack)
+
+        similarSection.axis = .vertical
+        similarSection.spacing = 8
+        similarSection.isHidden = true            // shown only once items arrive
+        similarSection.addArrangedSubview(similarTitleLabel)
+        similarSection.addArrangedSubview(similarScrollView)
+        stack.addArrangedSubview(similarSection)
+
+        // MARK: Vertical scroll view wrapping the main stack
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scrollView)               // added first so spinner/error stay on top
+        scrollView.addSubview(stack)
+
+        // MARK: Spinner
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
+
+        // MARK: Error state
         errorLabel.numberOfLines = 0
         errorLabel.textAlignment = .center
         errorLabel.textColor = .secondaryLabel
@@ -194,17 +225,71 @@ class ItemDetailViewController: UIViewController {
         errorStack.isHidden = true
         errorStack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(errorStack)
-        
-        view.addSubview(stack)
-                let guide = view.safeAreaLayoutGuide
-                NSLayoutConstraint.activate([
-                    stack.topAnchor.constraint(equalTo: guide.topAnchor, constant: 16),
-                    stack.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16),
-                    stack.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16),
-                    spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                    spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-                    errorStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                    errorStack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-                ])
+
+        // MARK: Constraints
+        let guide = view.safeAreaLayoutGuide
+        NSLayoutConstraint.activate([
+            // Scroll view: full height, respects side safe areas in landscape
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: guide.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: guide.trailingAnchor),
+
+            // Main stack inside the scroll view (16pt padding, width fixed to the screen)
+            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 16),
+            stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -16),
+            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -16),
+            stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -32),
+
+            // Horizontal cards row: scroll view sizes itself to the tallest card
+            similarStack.topAnchor.constraint(equalTo: similarScrollView.contentLayoutGuide.topAnchor),
+            similarStack.bottomAnchor.constraint(equalTo: similarScrollView.contentLayoutGuide.bottomAnchor),
+            similarStack.leadingAnchor.constraint(equalTo: similarScrollView.contentLayoutGuide.leadingAnchor),
+            similarStack.trailingAnchor.constraint(equalTo: similarScrollView.contentLayoutGuide.trailingAnchor),
+            similarScrollView.frameLayoutGuide.heightAnchor.constraint(equalTo: similarScrollView.contentLayoutGuide.heightAnchor),
+
+            // Spinner and error state, centred
+            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            errorStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            errorStack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+        ])
+    }
+    
+    // MARK: - Similar items
+
+    private func loadSimilarItems() {
+        APIClient.getSimilarItems(id: itemId) { [weak self] result in
+            DispatchQueue.main.async {
+                // Secondary content: on failure, just don't show the section.
+                guard let self = self, case .success(let items) = result else { return }
+                self.showSimilar(items)
+            }
+        }
+    }
+
+    private func showSimilar(_ items: [Item]) {
+        similarStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+        for item in items {
+            let card = ItemCardView(item: item)
+            card.addAction(UIAction { [weak self] _ in self?.openItem(id: item.id) }, for: .touchUpInside)
+            similarStack.addArrangedSubview(card)
+
+            // ~2.2 cards visible on iPhone (hints at scrolling), capped on wide screens.
+            let proportional = card.widthAnchor.constraint(equalTo: similarScrollView.frameLayoutGuide.widthAnchor,
+                                                           multiplier: 0.45)
+            proportional.priority = .defaultHigh
+            proportional.isActive = true
+            card.widthAnchor.constraint(lessThanOrEqualToConstant: 220).isActive = true
+        }
+        similarSection.isHidden = items.isEmpty
+    }
+
+    private func openItem(id: Int) {
+        let detail = ItemDetailViewController()
+        detail.itemId = id
+        navigationController?.pushViewController(detail, animated: true)
     }
 }
