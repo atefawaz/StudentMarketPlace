@@ -9,6 +9,7 @@ struct Item: Codable, Identifiable {
     let category: String
     let imageUrl: String?
     let sellerName: String
+    let sellerId : Int
     let createdAt: String
     let isSold: Bool
 
@@ -16,6 +17,7 @@ struct Item: Codable, Identifiable {
         case id, title, description, price, category
         case imageUrl = "image_url"
         case sellerName = "seller_name"
+        case sellerId = "seller_id"
         case createdAt = "created_at"
         case isSold = "is_sold"
     }
@@ -33,11 +35,9 @@ struct CreateItemRequest: Codable {
     let price: Double
     let category: String
     let imageUrl: String?
-    let sellerName: String
 
     enum CodingKeys: String, CodingKey {
         case title, description, price, category
         case imageUrl = "image_url"
-        case sellerName = "seller_name"
     }
 }
